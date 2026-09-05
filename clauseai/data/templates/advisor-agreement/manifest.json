@@ -1,0 +1,58 @@
+{
+  "slug": "advisor-agreement",
+  "title": "Advisor Agreement",
+  "category": "Agreements",
+  "description": "Advisor agreement covering advisory services, equity compensation, IP assignment, and confidentiality.",
+  "when_needed": "When engaging an advisor and granting equity for advice, introductions, or ongoing counsel.",
+  "source_url": "https://github.com/General-Legal/legal-templates/tree/main/templates/advisor-agreement",
+  "fields": [
+    {
+      "key": "services",
+      "label": "Advisory services",
+      "question": "What services will the advisor provide?",
+      "type": "textarea",
+      "required": false,
+      "marks": [0]
+    },
+    {
+      "key": "service_dates",
+      "label": "Service dates",
+      "question": "When will the services be provided?",
+      "type": "text",
+      "required": false,
+      "marks": [1]
+    },
+    {
+      "key": "restricted_field",
+      "label": "Restricted field",
+      "question": "What field should the advisor not compete in while this agreement is in effect?",
+      "type": "text",
+      "required": false,
+      "marks": [3]
+    },
+    {
+      "key": "option_shares",
+      "label": "Option shares",
+      "question": "How many shares will the advisor option cover?",
+      "type": "text",
+      "required": false,
+      "marks": [4]
+    },
+    {
+      "key": "vesting_years",
+      "label": "Vesting period (years)",
+      "question": "How many years is the vesting schedule?",
+      "type": "text",
+      "required": false,
+      "marks": [5]
+    },
+    {
+      "key": "vesting_installments",
+      "label": "Monthly installments",
+      "question": "How many equal monthly vesting installments?",
+      "type": "text",
+      "required": false,
+      "marks": [6]
+    }
+  ]
+}

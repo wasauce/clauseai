@@ -1,0 +1,88 @@
+{
+  "slug": "cookie-notice",
+  "title": "Cookie Notice",
+  "category": "Privacy",
+  "description": "Disclosure of cookie and tracking technology practices for websites and apps.",
+  "when_needed": "When you operate a website or app that uses cookies or similar tracking technologies.",
+  "source_url": "https://github.com/General-Legal/legal-templates/tree/main/templates/cookie-notice",
+  "transforms": [
+    {
+      "find": "| Type | Description | Who serves the cookies (link to privacy policy/site) | How to control them |\n| --- | --- | --- | --- |",
+      "replace": "| Type | Description |\n| --- | --- |"
+    },
+    {
+      "find": " | [ADD] | [ADD] |",
+      "replace": " |"
+    },
+    {
+      "find": "4. **Third-party opt-out option**. You can opt out of interest-based advertising through some of the third parties listed in the chart above by using the corresponding third-party opt-out tool provided in the chart.\n",
+      "replace": ""
+    },
+    {
+      "find": "5. **Industry association opt-outs**.",
+      "replace": "4. **Industry association opt-outs**."
+    },
+    {
+      "find": "6. **Blocking advertising ID use in your mobile settings**.",
+      "replace": "5. **Blocking advertising ID use in your mobile settings**."
+    },
+    {
+      "find": "[<mark>You can learn more about FullStory and opt out of session recording by FullStory at .]</mark>",
+      "replace": "You can learn more about <mark>FullStory</mark> and opt out of session recording by <mark>FullStory</mark> at ."
+    }
+  ],
+  "fields": [
+    {
+      "key": "company_name",
+      "label": "Company name",
+      "question": "What is the company's name?",
+      "type": "text",
+      "required": false,
+      "marks": [0, 1]
+    },
+    {
+      "key": "website_label",
+      "label": "Website label",
+      "question": "What should the site be called in the notice (for example, website)?",
+      "type": "text",
+      "required": false,
+      "marks": [2]
+    },
+    {
+      "key": "include_app",
+      "label": "Include a mobile app?",
+      "question": "Does this notice also cover a mobile app?",
+      "type": "choice",
+      "required": false,
+      "options": [
+        "; and our mobile app (App)",
+        "__omit__"
+      ],
+      "marks": [3]
+    },
+    {
+      "key": "analytics_provider",
+      "label": "Analytics or session tool",
+      "question": "Which analytics or session-recording tool do you use?",
+      "type": "text",
+      "required": false,
+      "marks": [5, 6, 7]
+    },
+    {
+      "key": "contact_email",
+      "label": "Contact email",
+      "question": "What email should people use for cookie questions?",
+      "type": "email",
+      "required": false,
+      "marks": [12]
+    },
+    {
+      "key": "effective_date",
+      "label": "Effective date",
+      "question": "When does this cookie notice take effect?",
+      "type": "date",
+      "required": false,
+      "marks": [13]
+    }
+  ]
+}

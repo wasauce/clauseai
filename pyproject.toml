@@ -1,0 +1,60 @@
+[project]
+name = "clauseai"
+version = "0.1.0"
+description = "Fill attorney-drafted General Legal templates and download PDF, ODT, or Markdown."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.104.1",
+    "uvicorn[standard]>=0.32.0",
+    "jinja2>=3.1.2",
+    "python-multipart>=0.0.6",
+    "python-dotenv>=1.0.0",
+    "pydantic[email]>=2.9.0",
+    "loguru>=0.7.2",
+    "httpx>=0.25.2",
+    "markdown>=3.5.0",
+    "md2pdf>=3.0.0",
+    "weasyprint>=65.0",
+    "pypandoc>=1.13",
+    "fastmcp>=2.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-timeout>=2.3.0",
+    "httpx>=0.25.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["clauseai"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"clauseai/data/templates" = "clauseai/data/templates"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--disable-warnings",
+    "--timeout=60",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

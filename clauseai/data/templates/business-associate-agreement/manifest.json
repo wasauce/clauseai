@@ -1,0 +1,34 @@
+{
+  "slug": "business-associate-agreement",
+  "title": "Business Associate Agreement (BAA)",
+  "category": "Healthcare & Compliance",
+  "description": "HIPAA-required contract between covered entities and business associates that handle protected health information.",
+  "when_needed": "When your company creates, receives, maintains, or transmits PHI for a healthcare customer.",
+  "source_url": "https://github.com/General-Legal/legal-templates/tree/main/templates/business-associate-agreement",
+  "fields": [
+    {
+      "key": "company_legal_name",
+      "label": "Company legal name",
+      "question": "What is the company's full legal name?",
+      "type": "text",
+      "required": false,
+      "marks": [0]
+    },
+    {
+      "key": "state_of_incorporation",
+      "label": "State of incorporation",
+      "question": "In which state is the company incorporated?",
+      "type": "text",
+      "required": false,
+      "marks": [1]
+    },
+    {
+      "key": "services_description",
+      "label": "Services",
+      "question": "What services does the company provide (for example, cloud-based software services)?",
+      "type": "text",
+      "required": false,
+      "marks": [2]
+    }
+  ]
+}

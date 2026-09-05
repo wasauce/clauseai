@@ -1,0 +1,135 @@
+{% extends "layout.html" %}
+
+{% block main_classes %}bg-gray-50{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <p class="mb-4">
+        <a href="/" class="text-sm text-indigo-700 hover:text-indigo-900">
+            &larr; All templates
+        </a>
+    </p>
+    <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600 mb-2">
+        {{ template.category }}
+    </p>
+    <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
+        {{ template.title }}
+    </h1>
+    <p class="text-gray-600 mb-2">{{ template.description }}</p>
+    {% if template.when_needed %}
+    <p class="text-gray-500 mb-8">{{ template.when_needed }}</p>
+    {% endif %}
+
+    <form
+        method="post"
+        action="/{{ template.slug }}/generate"
+        class="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 space-y-6"
+    >
+        <p class="text-sm text-gray-500">
+            Answer what you know. Skip the rest and download anytime.
+        </p>
+
+        {% for field in fields %}
+        <div>
+            <label
+                for="field_{{ field.key }}"
+                class="block text-sm font-medium text-gray-900 mb-1"
+            >
+                {{ field.question }}
+            </label>
+            {% if field.type == "textarea" %}
+            <textarea
+                id="field_{{ field.key }}"
+                name="field_{{ field.key }}"
+                rows="3"
+                class="w-full rounded-lg border-gray-300 border px-3 py-2 text-gray-900"
+            ></textarea>
+            {% elif field.type == "choice" %}
+            <select
+                id="field_{{ field.key }}"
+                name="field_{{ field.key }}"
+                class="w-full rounded-lg border-gray-300 border px-3 py-2 text-gray-900 bg-white"
+            >
+                <option value="">Leave as placeholder</option>
+                {% for option in field.options %}
+                <option value="{{ option }}">
+                    {%- if option == omit_sentinel or not option -%}
+                    (omit)
+                    {%- else -%}
+                    {{ option }}
+                    {%- endif -%}
+                </option>
+                {% endfor %}
+            </select>
+            {% elif field.type == "date" %}
+            <input
+                id="field_{{ field.key }}"
+                name="field_{{ field.key }}"
+                type="date"
+                class="w-full rounded-lg border-gray-300 border px-3 py-2 text-gray-900"
+            >
+            {% elif field.type == "email" %}
+            <input
+                id="field_{{ field.key }}"
+                name="field_{{ field.key }}"
+                type="email"
+                class="w-full rounded-lg border-gray-300 border px-3 py-2 text-gray-900"
+            >
+            {% else %}
+            <input
+                id="field_{{ field.key }}"
+                name="field_{{ field.key }}"
+                type="text"
+                class="w-full rounded-lg border-gray-300 border px-3 py-2 text-gray-900"
+            >
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="border-t border-gray-100 pt-6 space-y-4">
+            <div>
+                <label for="format" class="block text-sm font-medium text-gray-900 mb-1">
+                    Download format
+                </label>
+                <select
+                    id="format"
+                    name="format"
+                    class="w-full rounded-lg border-gray-300 border px-3 py-2 text-gray-900 bg-white"
+                >
+                    <option value="pdf" selected>PDF</option>
+                    <option value="odt">OpenDocument (.odt)</option>
+                    <option value="markdown">Markdown</option>
+                </select>
+            </div>
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-900 mb-1">
+                    Email (optional)
+                </label>
+                <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    class="w-full rounded-lg border-gray-300 border px-3 py-2 text-gray-900"
+                    placeholder="Where should we mention this download happened?"
+                >
+            </div>
+            <button
+                type="submit"
+                class="w-full sm:w-auto inline-flex justify-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-full"
+            >
+                Download now
+            </button>
+        </div>
+    </form>
+
+    <div class="mt-10">
+        {% include "agent_box.html" %}
+    </div>
+
+    <p class="mt-8 text-sm text-gray-500">
+        Source:
+        <a class="underline" href="{{ template.source_url }}">General Legal template</a>.
+        Not legal advice.
+    </p>
+</div>
+{% endblock %}

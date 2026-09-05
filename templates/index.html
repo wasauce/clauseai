@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+
+{% block main_classes %}bg-gray-50{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="mb-10">
+        <h1 class="text-4xl font-bold text-gray-900 mb-3">ClauseAI</h1>
+        <p class="text-lg text-gray-600 max-w-3xl">
+            Pick a template, answer a few questions, and download a PDF, OpenDocument,
+            or Markdown file. You can download at any time — even with nothing filled in.
+        </p>
+    </div>
+
+    <div class="mb-12">
+        {% include "agent_box.html" %}
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for card in template_cards %}
+        <a
+            href="/{{ card.slug }}"
+            class="block bg-white rounded-2xl border border-gray-200 p-6 hover:border-indigo-300 hover:shadow-md transition-all"
+        >
+            <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600 mb-2">
+                {{ card.category }}
+            </p>
+            <h2 class="text-xl font-semibold text-gray-900 mb-2">{{ card.title }}</h2>
+            <p class="text-gray-600 mb-4">{{ card.description }}</p>
+            {% if card.when_needed %}
+            <p class="text-sm text-gray-500">{{ card.when_needed }}</p>
+            {% endif %}
+            <p class="mt-4 text-sm font-medium text-indigo-700">
+                {{ card.field_count }} quick question{{ 's' if card.field_count != 1 else '' }}
+            </p>
+        </a>
+        {% endfor %}
+    </div>
+
+    <p class="mt-12 text-sm text-gray-500 max-w-3xl">
+        Templates are attorney-drafted by
+        <a class="underline" href="https://general.legal">General Legal</a>
+        and released under CC0. They are for general reference only and are not
+        legal advice. Use of a template does not create an attorney-client relationship.
+    </p>
+</div>
+{% endblock %}

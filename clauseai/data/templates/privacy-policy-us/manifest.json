@@ -1,0 +1,166 @@
+{
+  "slug": "privacy-policy-us",
+  "title": "Privacy Policy (U.S. Only)",
+  "category": "Privacy",
+  "description": "Privacy policy covering U.S. federal and state privacy laws including CCPA/CPRA.",
+  "when_needed": "When you primarily serve U.S. users and need a public-facing privacy policy.",
+  "source_url": "https://github.com/General-Legal/legal-templates/tree/main/templates/privacy-policy-us",
+  "transforms": [
+    {
+      "find": "[<mark>Full Company Name</mark>] [and our subsidiaries and affiliates] (\"**[**<mark>CompanyName</mark>**]**,\" \"**we**\", \"**us**\" or \"**our**\") provides a [<mark>DESCRIPTION OF BUSINESS</mark>]. This Privacy Policy describes how [CompanyName] processes",
+      "replace": "<mark>[Full Company Name]</mark> [and our subsidiaries and affiliates] (\"**<mark>[CompanyName]</mark>**,\" \"**we**\", \"**us**\" or \"**our**\") provides a <mark>[DESCRIPTION OF BUSINESS]</mark>. This Privacy Policy describes how <mark>[CompanyName]</mark> processes"
+    },
+    {
+      "find": "[<mark>CompanyName</mark>]",
+      "replace": "<mark>[CompanyName]</mark>"
+    },
+    {
+      "find": "| [INSERT] | [INSERT] | [INSERT] | [INSERT] | [INSERT] |\n| [INSERT] | [INSERT] | [INSERT] | [INSERT] | [INSERT] |\n| [INSERT] | [INSERT] | [INSERT] | [INSERT] | [INSERT] |\n| [INSERT] | [INSERT] | [INSERT] | [INSERT] | [INSERT] |\n| [INSERT] | [INSERT] | [INSERT] | [INSERT] | [INSERT] |",
+      "replace": "<mark>| [INSERT] | [INSERT] | [INSERT] | [INSERT] | [INSERT] |\n| [INSERT] | [INSERT] | [INSERT] | [INSERT] | [INSERT] |\n| [INSERT] | [INSERT] | [INSERT] | [INSERT] | [INSERT] |\n| [INSERT] | [INSERT] | [INSERT] | [INSERT] | [INSERT] |\n| [INSERT] | [INSERT] | [INSERT] | [INSERT] | [INSERT] |</mark>"
+    }
+  ],
+  "fields": [
+    {
+      "key": "effective_date",
+      "label": "Effective date",
+      "question": "When does this privacy policy take effect?",
+      "type": "date",
+      "required": false,
+      "marks": [0]
+    },
+    {
+      "key": "full_company_name",
+      "label": "Full legal name",
+      "question": "What is the company's full legal name?",
+      "type": "text",
+      "required": false,
+      "marks": [1]
+    },
+    {
+      "key": "company_name",
+      "label": "Company short name",
+      "question": "What shorter company name should appear throughout the policy?",
+      "type": "text",
+      "required": false,
+      "marks": [2, 4, 22, 23, 24]
+    },
+    {
+      "key": "business_description",
+      "label": "Business description",
+      "question": "In one sentence, what does the company do?",
+      "type": "textarea",
+      "required": false,
+      "marks": [3]
+    },
+    {
+      "key": "ai_provider",
+      "label": "Chat or AI provider",
+      "question": "Which chatbot or generative AI provider do you use, if any?",
+      "type": "text",
+      "required": false,
+      "marks": [8, 12]
+    },
+    {
+      "key": "company_email",
+      "label": "Privacy contact email",
+      "question": "What email should people use for privacy requests?",
+      "type": "email",
+      "required": false,
+      "marks": [32, 43, 47, 48]
+    },
+    {
+      "key": "company_address",
+      "label": "Company address",
+      "question": "What is the company's postal address?",
+      "type": "textarea",
+      "required": false,
+      "marks": [33]
+    },
+    {
+      "key": "company_phone",
+      "label": "Company phone",
+      "question": "What phone number should be listed?",
+      "type": "text",
+      "required": false,
+      "marks": [34, 44]
+    },
+    {
+      "key": "targeted_advertising",
+      "label": "Targeted advertising",
+      "question": "Do you process personal information for targeted advertising?",
+      "type": "choice",
+      "required": false,
+      "options": [
+        "We may process Personal Information for targeted advertising purposes. You can opt-out of certain processing of personal information for targeted advertising purposes.",
+        "We do not process your personal information for targeted advertising purposes."
+      ],
+      "marks": [37]
+    },
+    {
+      "key": "profiling",
+      "label": "Profiling and automated decisions",
+      "question": "Do you use personal information for profiling or automated decision-making?",
+      "type": "choice",
+      "required": false,
+      "options": [
+        "We may use your Personal Information to engage in profiling or to perform automated decision-making that [INSERT DESCRIPTION]. You can opt-out of such automated processing or profiling.",
+        "We do not use your Personal Information to engage in profiling or to perform automated decision-making that results in significant financial impacts, significant impacts on housing, education, employment, health care, or criminal justice, or similarly significant impacts."
+      ],
+      "marks": [38]
+    },
+    {
+      "key": "profiling_description",
+      "label": "Profiling description",
+      "question": "If you use profiling or automated decision-making, briefly describe those uses (for example, 'determines eligibility for premium features'). Skip this if you do not.",
+      "type": "textarea",
+      "required": false,
+      "replaces": "[INSERT DESCRIPTION]",
+      "marks": []
+    },
+    {
+      "key": "sells_personal_info",
+      "label": "Sale of personal information",
+      "question": "Do you sell personal information under U.S. state privacy laws?",
+      "type": "choice",
+      "required": false,
+      "options": [
+        "You can opt-out of other sales of your Personal Information.",
+        "We do not sell your Personal Information within the meaning of State Privacy Laws."
+      ],
+      "marks": [39]
+    },
+    {
+      "key": "minors_personal_info",
+      "label": "Personal information of minors",
+      "question": "Do you collect, sell, or share personal information of consumers under 16?",
+      "type": "choice",
+      "required": false,
+      "options": [
+        "Opt-in. We may sell or share the personal information of consumers between 13-15 years of age. If we know that you are 13-15 years of age, we will ask for your affirmative authorization to sell your Personal Information or share your Personal Information for targeted advertising purposes before we do so. Note that we do not intentionally collect Personal Information from children under the age of 13.",
+        "Consumers under 16. We do not have actual knowledge that we collect, sell or share the personal information of consumers under 16 years of age."
+      ],
+      "marks": [40]
+    },
+    {
+      "key": "sensitive_personal_info",
+      "label": "Sensitive personal information",
+      "question": "How do you handle Sensitive Personal Information?",
+      "type": "choice",
+      "required": false,
+      "options": [
+        "Limit processing of Sensitive Personal Information. We may collect certain categories of Sensitive Personal Information as described in this Privacy Policy. You can ask us to stop the processing of your Sensitive Personal Information for purposes of inferring characteristics about you.",
+        "Sensitive Personal Information. While we process certain categories of Sensitive Personal Information as described in this Privacy Policy, we do not process Sensitive Personal Information for the purpose of inferring characteristics about consumers under the CCPA.",
+        "Sensitive Personal Information. We do not intentionally collect or process Sensitive Personal Information."
+      ],
+      "marks": [41]
+    },
+    {
+      "key": "ccpa_disclosure_table",
+      "label": "CCPA personal-information chart",
+      "question": "List each category of personal information you collect as markdown table rows. Each row needs five cells: PI category, CCPA statutory category, purposes, parties you disclose it to for a business purpose, and parties you sell or share it with. Example: | Contact data | Identifiers | Service delivery | Service providers | None |",
+      "type": "textarea",
+      "required": false,
+      "marks": [46]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "slug": "one-way-nda",
+  "title": "One-Way Non-Disclosure Agreement",
+  "category": "Agreements",
+  "description": "One-way confidentiality agreement protecting a single disclosing party's information.",
+  "when_needed": "When only your company is sharing confidential information with the other side.",
+  "source_url": "https://github.com/General-Legal/legal-templates/tree/main/templates/one-way-nda",
+  "transforms": [
+    {
+      "find": "- [Company Name]",
+      "replace": "- <mark>[Company Name]</mark>"
+    },
+    {
+      "find": "solely to [<mark>enable Recipient</mark> to <mark>evaluate or pursue a business relationship with the Company</mark>]",
+      "replace": "solely to <mark>enable Recipient</mark> to <mark>evaluate or pursue a business relationship with the Company</mark>"
+    }
+  ],
+  "fields": [
+    {
+      "key": "company_name",
+      "label": "Company name",
+      "question": "What is the disclosing company's name?",
+      "type": "text",
+      "required": false,
+      "marks": [0, 3]
+    },
+    {
+      "key": "recipient_action",
+      "label": "Recipient action",
+      "question": "What may the recipient do with the information (for example, enable Recipient)?",
+      "type": "text",
+      "required": false,
+      "marks": [1]
+    },
+    {
+      "key": "permitted_use",
+      "label": "Permitted use",
+      "question": "What is the permitted use of the confidential information?",
+      "type": "text",
+      "required": false,
+      "marks": [2]
+    }
+  ]
+}

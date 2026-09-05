@@ -1,0 +1,93 @@
+{
+  "slug": "terms-of-use",
+  "title": "Terms of Use",
+  "category": "Website",
+  "description": "Website terms of use covering access rights, IP protections, liability limits, and DecisionLayer arbitration for disputes.",
+  "when_needed": "When publishing a website or product and you need public terms of use.",
+  "source_url": "https://github.com/General-Legal/legal-templates/tree/main/templates/terms-of-use",
+  "transforms": [
+    {
+      "find": "11\\. \\*\\*Dispute Resolution\\. \\[<mark>Two alternative.*?<mark> \\]</mark>\\*\\*",
+      "replace": "11. **Dispute Resolution.**",
+      "regex": true
+    },
+    {
+      "find": "<mark>Date</mark>, 202<mark>[_]</mark>",
+      "replace": "<mark>[Date]</mark>"
+    },
+    {
+      "find": "Copyright © 202<mark>[_][Company]</mark>",
+      "replace": "Copyright © <mark>2026</mark> <mark>[Company]</mark>"
+    },
+    {
+      "find": "These Terms are governed by the Rules, the Federal Arbitration Act, applicable federal law, and the internal laws of the State of New York (without reference to conflict-of-law rules).",
+      "replace": "This arbitration agreement is governed by the Rules, the Federal Arbitration Act, applicable federal law, and the internal laws of the State of New York (without reference to conflict-of-law rules). The substantive law governing these Terms is set out in Section 10."
+    }
+  ],
+  "fields": [
+    {
+      "key": "effective_date",
+      "label": "Effective date",
+      "question": "When do these terms take effect?",
+      "type": "date",
+      "required": false,
+      "marks": [0]
+    },
+    {
+      "key": "domain_name",
+      "label": "Domain name",
+      "question": "What is the website domain?",
+      "type": "text",
+      "required": false,
+      "marks": [1]
+    },
+    {
+      "key": "company_name",
+      "label": "Company name",
+      "question": "What is the company's name?",
+      "type": "text",
+      "required": false,
+      "marks": [2, 5, 16]
+    },
+    {
+      "key": "privacy_policy_url",
+      "label": "Privacy policy URL",
+      "question": "What is the URL of your privacy policy?",
+      "type": "text",
+      "required": false,
+      "marks": [3, 8]
+    },
+    {
+      "key": "company_address",
+      "label": "Company address",
+      "question": "What is the company's address?",
+      "type": "textarea",
+      "required": false,
+      "marks": [6]
+    },
+    {
+      "key": "company_email",
+      "label": "Company email",
+      "question": "What email should be used for notices, contact, accessibility, and arbitration opt-outs?",
+      "type": "email",
+      "required": false,
+      "marks": [7, 9, 14, 17, 18]
+    },
+    {
+      "key": "governing_state",
+      "label": "Governing state",
+      "question": "Which state governs these terms?",
+      "type": "text",
+      "required": false,
+      "marks": [11, 13]
+    },
+    {
+      "key": "governing_county",
+      "label": "Governing county",
+      "question": "Which county should venue sit in?",
+      "type": "text",
+      "required": false,
+      "marks": [12]
+    }
+  ]
+}

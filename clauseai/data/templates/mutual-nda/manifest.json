@@ -1,0 +1,32 @@
+{
+  "slug": "mutual-nda",
+  "title": "Mutual Non-Disclosure Agreement",
+  "category": "Agreements",
+  "description": "Two-way confidentiality agreement for parties sharing sensitive information while exploring a business relationship.",
+  "when_needed": "When two companies will exchange confidential information while evaluating a deal or partnership.",
+  "source_url": "https://github.com/General-Legal/legal-templates/tree/main/templates/mutual-nda",
+  "transforms": [
+    {
+      "find": "- [Company]",
+      "replace": "- <mark>[Company]</mark>"
+    }
+  ],
+  "fields": [
+    {
+      "key": "company_name",
+      "label": "Company name",
+      "question": "What is your company's name?",
+      "type": "text",
+      "required": false,
+      "marks": [0, 2]
+    },
+    {
+      "key": "effective_date",
+      "label": "Effective date",
+      "question": "What is the effective date of the NDA?",
+      "type": "date",
+      "required": false,
+      "marks": [1]
+    }
+  ]
+}

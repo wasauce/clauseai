@@ -1,0 +1,80 @@
+{
+  "slug": "dpa-global",
+  "title": "Data Processing Addendum (Global)",
+  "category": "Privacy",
+  "description": "Processor-friendly DPA for U.S., EU/EEA, UK, and Switzerland with GDPR-aligned obligations.",
+  "when_needed": "When you process personal data for customers who have users in the U.S., EU/EEA, UK, or Switzerland.",
+  "source_url": "https://github.com/General-Legal/legal-templates/tree/main/templates/dpa-global",
+  "transforms": [
+    {
+      "find": "- [CompanyName] By:",
+      "replace": "- [<mark>CompanyName</mark>] By:"
+    }
+  ],
+  "fields": [
+    {
+      "key": "company_name",
+      "label": "Company name",
+      "question": "What is the processor company's name?",
+      "type": "text",
+      "required": false,
+      "marks": [0, 3, 4]
+    },
+    {
+      "key": "customer_agreement_name",
+      "label": "Customer agreement name",
+      "question": "What is the name of the main customer agreement this DPA attaches to?",
+      "type": "text",
+      "required": false,
+      "marks": [1]
+    },
+    {
+      "key": "effective_date",
+      "label": "Effective date",
+      "question": "What is the effective date of the customer agreement?",
+      "type": "date",
+      "required": false,
+      "marks": [2]
+    },
+    {
+      "key": "company_address",
+      "label": "Company address",
+      "question": "What is the company's address?",
+      "type": "textarea",
+      "required": false,
+      "marks": [5]
+    },
+    {
+      "key": "privacy_contact_role",
+      "label": "Data protection contact",
+      "question": "What role or team handles data protection questions (for example, Privacy Team)?",
+      "type": "text",
+      "required": false,
+      "marks": [6]
+    },
+    {
+      "key": "privacy_contact_email",
+      "label": "Data protection email",
+      "question": "What email should data protection questions go to?",
+      "type": "email",
+      "required": false,
+      "marks": [7]
+    },
+    {
+      "key": "company_description",
+      "label": "Company description",
+      "question": "Briefly describe the company and the processing it performs.",
+      "type": "textarea",
+      "required": false,
+      "marks": [8]
+    },
+    {
+      "key": "subprocessor_list",
+      "label": "Subprocessor list",
+      "question": "Where can customers find your subprocessors (for example, Annex 5 or a URL)?",
+      "type": "text",
+      "required": false,
+      "marks": [12]
+    }
+  ]
+}

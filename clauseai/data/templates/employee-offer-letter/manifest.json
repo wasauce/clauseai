@@ -1,0 +1,150 @@
+{
+  "slug": "employee-offer-letter",
+  "title": "Employee Offer Letter (California Exempt)",
+  "category": "Employment",
+  "description": "Offer letter for California exempt hires covering compensation, exempt-employee policies, and DecisionLayer arbitration.",
+  "when_needed": "When hiring a California exempt employee and you need a short-form offer letter.",
+  "source_url": "https://github.com/General-Legal/legal-templates/tree/main/templates/employee-offer-letter",
+  "transforms": [
+    {
+      "find": "\\[Select one of the following arbitration options.*?see https://decisionlayer\\.ai\\. ",
+      "replace": "",
+      "regex": true
+    },
+    {
+      "find": "sending written notice to [Insert Email or Address]",
+      "replace": "sending written notice to <mark>[Insert Email or Address]</mark>"
+    },
+    {
+      "find": "| [Employee Name] |  | Date |",
+      "replace": "| <mark>[Employee Name]</mark> |  | Date |"
+    },
+    {
+      "find": "[<mark>the Company's office at [location]/your home office (remote)] in </mark>[<mark>city, California</mark>]",
+      "replace": "[<mark>the Company's office at [location]/your home office (remote)</mark>] in [<mark>city</mark>, California]"
+    },
+    {
+      "find": "$[<mark>annual salary], subject to applicable</mark>",
+      "replace": "$[<mark>annual salary</mark>], subject to applicable"
+    },
+    {
+      "find": "[<mark>once per month / semimonthly / every two weeks] basis.</mark>",
+      "replace": "[<mark>once per month / semimonthly / every two weeks</mark>] basis."
+    }
+  ],
+  "fields": [
+    {
+      "key": "company_name",
+      "label": "Company name",
+      "question": "What is the company's name?",
+      "type": "text",
+      "required": false,
+      "marks": [0, 6]
+    },
+    {
+      "key": "letter_date",
+      "label": "Letter date",
+      "question": "What date should appear on the offer letter?",
+      "type": "date",
+      "required": false,
+      "marks": [1]
+    },
+    {
+      "key": "employee_name",
+      "label": "Employee name",
+      "question": "What is the employee's full name?",
+      "type": "text",
+      "required": false,
+      "marks": [2, 17]
+    },
+    {
+      "key": "employee_address",
+      "label": "Employee address",
+      "question": "What is the employee's mailing address?",
+      "type": "textarea",
+      "required": false,
+      "marks": [3, 4]
+    },
+    {
+      "key": "employee_first_name",
+      "label": "First name",
+      "question": "What first name should the letter use in the greeting?",
+      "type": "text",
+      "required": false,
+      "marks": [5]
+    },
+    {
+      "key": "position",
+      "label": "Position",
+      "question": "What is the job title?",
+      "type": "text",
+      "required": false,
+      "marks": [7]
+    },
+    {
+      "key": "duties",
+      "label": "Duties",
+      "question": "In a phrase, what will they do?",
+      "type": "text",
+      "required": false,
+      "marks": [8]
+    },
+    {
+      "key": "manager",
+      "label": "Manager",
+      "question": "Who will they report to?",
+      "type": "text",
+      "required": false,
+      "marks": [9]
+    },
+    {
+      "key": "work_location",
+      "label": "Work location",
+      "question": "Where will they work?",
+      "type": "choice",
+      "required": false,
+      "options": [
+        "the Company's office",
+        "your home office (remote)"
+      ],
+      "marks": [10]
+    },
+    {
+      "key": "city",
+      "label": "City",
+      "question": "Which California city is the place of employment?",
+      "type": "text",
+      "required": false,
+      "marks": [11]
+    },
+    {
+      "key": "annual_salary",
+      "label": "Annual salary",
+      "question": "What is the annual salary? Enter the number only, without a dollar sign (for example, 100,000).",
+      "type": "text",
+      "required": false,
+      "marks": [12]
+    },
+    {
+      "key": "pay_cadence",
+      "label": "Pay cadence",
+      "question": "How often will they be paid?",
+      "type": "choice",
+      "required": false,
+      "options": [
+        "once per month",
+        "semimonthly",
+        "every two weeks"
+      ],
+      "marks": [13]
+    },
+    {
+      "key": "opt_out_contact",
+      "label": "Arbitration opt-out contact",
+      "question": "Where should the employee send a written arbitration opt-out notice (email or mailing address)?",
+      "type": "text",
+      "required": false,
+      "marks": [14]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "slug": "master-services-agreement",
+  "title": "Master Services Agreement (MSA)",
+  "category": "Agreements",
+  "description": "Tech-oriented MSA for companies deploying software and providing platform or integration services.",
+  "when_needed": "When selling software, platform access, or integration services under a master agreement.",
+  "source_url": "https://github.com/General-Legal/legal-templates/tree/main/templates/master-services-agreement",
+  "fields": [
+    {
+      "key": "effective_date",
+      "label": "Effective date",
+      "question": "What is the effective date of the MSA?",
+      "type": "date",
+      "required": false,
+      "marks": [0]
+    },
+    {
+      "key": "company_name",
+      "label": "Company name",
+      "question": "What is the provider company's name?",
+      "type": "text",
+      "required": false,
+      "marks": [1, 7, 11]
+    },
+    {
+      "key": "customer_name",
+      "label": "Customer name",
+      "question": "What is the customer's name?",
+      "type": "text",
+      "required": false,
+      "marks": [2, 8, 10]
+    },
+    {
+      "key": "governing_state",
+      "label": "Governing law state",
+      "question": "Which state's law governs the agreement?",
+      "type": "text",
+      "required": false,
+      "marks": [3]
+    },
+    {
+      "key": "company_email",
+      "label": "Company email",
+      "question": "What company email should be used for notices and informal dispute contact?",
+      "type": "email",
+      "required": false,
+      "marks": [4, 6]
+    },
+    {
+      "key": "arbitration_venue",
+      "label": "Arbitration venue",
+      "question": "Where should arbitration take place (city and state or county)?",
+      "type": "text",
+      "required": false,
+      "marks": [5]
+    }
+  ]
+}
