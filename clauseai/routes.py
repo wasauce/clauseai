@@ -13,7 +13,13 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, EmailStr, Field, ValidationError
 
-from clauseai.config import get_base_url
+from clauseai.config import (
+    GITHUB_REPO,
+    LISTING_DESCRIPTION,
+    PRODUCTION_BASE_URL,
+    SKILL_INSTALL_COMMAND,
+    get_base_url,
+)
 from clauseai.log import get_logger
 from clauseai.service import (
     OMIT_ANSWER,
@@ -52,11 +58,12 @@ def _page_context(request: Request, **kwargs: Any) -> dict[str, Any]:
     base_url = get_base_url()
     context = {
         "request": request,
-        "noindex": True,
+        "noindex": False,
         "base_url": base_url,
         "skill_url": f"{base_url}/skill.md",
         "mcp_url": f"{base_url}/mcp",
         "api_url": f"{base_url}/api/templates",
+        "skill_install": SKILL_INSTALL_COMMAND,
         "agent_prompt": (
             f"Read the ClauseAI skill at {base_url}/skill.md "
             "and follow it to build the legal documents I need. Fill in "
@@ -175,73 +182,53 @@ async def _run_generation(
     )
 
 
+SKILL_PATH = ROOT_DIR / "skills" / "clauseai" / "SKILL.md"
+WALKTHROUGH_PATH = ROOT_DIR / "examples" / "generate-nda.md"
+
+
 def build_skill_markdown(base_url: Optional[str] = None) -> str:
     """Return the ClauseAI agent skill document."""
     root = (base_url or get_base_url()).rstrip("/")
-    api = f"{root}/api/templates"
-    mcp = f"{root}/mcp"
-    lines = [
-        "---",
-        "name: clauseai",
-        "description: Generate attorney-drafted startup legal documents "
-        "(NDA, MSA, privacy policy, offer letter, DPA, BAA, terms of use) "
-        "as PDF, ODT, or Markdown. Use when a user wants a legal template "
-        "filled in or downloaded. No registration required.",
-        "---",
-        "",
-        "# ClauseAI",
-        "",
-        "ClauseAI fills General Legal CC0 templates from a short list of",
-        "fields. Do not rewrite the document; only the published fields",
-        "are fillable. Fill in as many fields as you can from what you",
-        "already know before asking the user anything. Every field is",
-        "optional, so the user can skip any question and download",
-        "immediately.",
-        "",
-        "## Endpoints",
-        "",
-        f"- List templates: `GET {api}`",
-        f"- Field schema: `GET {api}/{{slug}}`",
-        f"- Generate: `POST {api}/{{slug}}/generate`",
-        f"- MCP: `{mcp}`",
-        "",
-        "## Generate request",
-        "",
-        "```json",
-        "{",
-        '  "answers": {"company_name": "Acme Inc."},',
-        '  "format": "pdf",',
-        '  "email": "optional@example.com",',
-        '  "response": "json"',
-        "}",
-        "```",
-        "",
-        "`format` is `pdf`, `odt`, or `markdown`. `response` of `json`",
-        "returns base64 content; omit it or use `file` for a download.",
-        "Email is optional. If the user gives one, include it.",
-        "Choice fields may include `__omit__`. Send that value to",
-        "remove a placeholder. Empty strings are unanswered, not omit.",
-        "",
-        "## Workflow",
-        "",
-        "1. List templates and pick the best slug.",
-        "2. Fetch the field schema.",
-        "3. Fill in as many answers as you can yourself before asking",
-        "   the user anything. Use the conversation, the user's files and",
-        "   codebase, and anything you know about their company: name,",
-        "   legal entity, domain, address, contact emails, governing",
-        "   state, and today's date for effective dates. Make reasonable",
-        "   inferences.",
-        "4. Only ask the user for fields you genuinely cannot determine.",
-        "   Do it in one short message that also shows the values you",
-        "   inferred so they can correct them. Never block on missing",
-        "   answers; every field is optional.",
-        "5. POST generate with whatever answers you have.",
-        "6. Return the file to the user.",
-        "",
-        "These documents are templates, not legal advice.",
-    ]
-    return "\n".join(lines) + "\n"
+    return SKILL_PATH.read_text(encoding="utf-8").replace(PRODUCTION_BASE_URL, root)
+
+
+def build_llms_txt(base_url: Optional[str] = None) -> str:
+    """Return a concise index for agents navigating the site."""
+    root = (base_url or get_base_url()).rstrip("/")
+    github = f"https://github.com/{GITHUB_REPO}"
+    return "\n".join(
+        [
+            "# ClauseAI",
+            "",
+            f"> {LISTING_DESCRIPTION}",
+            "",
+            "ClauseAI fills attorney-drafted General Legal CC0 templates.",
+            "Connect over MCP or install the skill. No account is required.",
+            "",
+            "## Skill and MCP",
+            "",
+            f"- [Agent skill]({root}/skill.md): Instructions for filling templates",
+            f"- [Well-known skill]({root}/.well-known/skills/clauseai/SKILL.md): Installer alias",
+            f"- [MCP server]({root}/mcp): Streamable HTTP tools for listing, inspecting, and generating documents",
+            f"- [Install the skill]({github}): `{SKILL_INSTALL_COMMAND}`",
+            "",
+            "## API",
+            "",
+            f"- [Interactive docs]({root}/docs): FastAPI Swagger UI",
+            f"- [OpenAPI]({root}/openapi.json): Machine-readable API schema",
+            f"- [Template catalog (JSON)]({root}/api/templates): Slugs, titles, and descriptions",
+            "",
+            "## Templates",
+            "",
+            f"- [Gallery]({root}/): Human-readable template catalog",
+            f"- [Generate a mutual NDA]({root}/examples/generate-nda.md): Walkthrough with install command, MCP URL, and sample output",
+            "",
+            "## Optional",
+            "",
+            "- [General Legal templates](https://github.com/General-Legal/legal-templates): Upstream CC0 source",
+            "",
+        ]
+    )
 
 
 @router.get("/", response_class=HTMLResponse, summary="ClauseAI gallery")
@@ -253,12 +240,36 @@ async def clauseai_gallery(request: Request) -> HTMLResponse:
         _page_context(
             request,
             title="ClauseAI",
-            description=(
-                "Pick a legal template, answer a few questions, and "
-                "download a PDF, ODT, or Markdown document."
-            ),
+            description=LISTING_DESCRIPTION,
             template_cards=summarize_templates(),
         ),
+    )
+
+
+@router.get("/llms.txt", summary="Agent index")
+async def llms_txt() -> Response:
+    """Serve a concise index of skill, API, and template surfaces."""
+    return Response(
+        content=build_llms_txt(),
+        media_type="text/markdown; charset=utf-8",
+    )
+
+
+@router.get("/robots.txt", include_in_schema=False)
+async def robots_txt() -> Response:
+    """Allow crawlers on public pages; hide the health endpoint."""
+    return Response(
+        content="User-agent: *\nAllow: /\nDisallow: /health\n",
+        media_type="text/plain; charset=utf-8",
+    )
+
+
+@router.get("/examples/generate-nda.md", summary="Mutual NDA walkthrough")
+async def generate_nda_walkthrough() -> Response:
+    """Serve the published example walkthrough."""
+    return Response(
+        content=WALKTHROUGH_PATH.read_text(encoding="utf-8"),
+        media_type="text/markdown; charset=utf-8",
     )
 
 
@@ -329,7 +340,18 @@ async def api_generate_template(
     )
 
 
-_RESERVED_SLUGS = {"api", "mcp", "skill.md", "health"}
+_RESERVED_SLUGS = {
+    "api",
+    "mcp",
+    "skill.md",
+    "health",
+    "llms.txt",
+    "robots.txt",
+    "examples",
+    "docs",
+    "redoc",
+    "openapi.json",
+}
 
 
 @router.get("/{slug}", response_class=HTMLResponse, summary="ClauseAI wizard")

@@ -8,6 +8,7 @@ from typing import Any, Optional
 from fastmcp import FastMCP
 
 from clauseai import service as clauseai
+from clauseai.config import LISTING_DESCRIPTION, PRODUCTION_BASE_URL
 from clauseai.log import get_logger
 
 logger = get_logger(__name__)
@@ -15,22 +16,22 @@ logger = get_logger(__name__)
 mcp = FastMCP(
     "ClauseAI",
     instructions=(
-        "Fill attorney-drafted General Legal templates from a few "
-        "questions and return PDF, ODT, or Markdown. No registration "
-        "is required. List templates, inspect fields, then generate."
+        f"{LISTING_DESCRIPTION} List templates, inspect fields, then generate."
     ),
+    version="0.1.0",
+    website_url=PRODUCTION_BASE_URL,
 )
 
 
 @mcp.tool
 def list_templates() -> list[dict[str, Any]]:
-    """List available legal document templates."""
+    """List attorney-drafted startup legal templates (NDA, MSA, DPA, privacy policy, offer letter, and more)."""
     return clauseai.summarize_templates()
 
 
 @mcp.tool
 def get_template_fields(slug: str) -> dict[str, Any]:
-    """Return the questions needed to fill one template."""
+    """Get the fill-in fields for one legal template before generating a document."""
     try:
         return clauseai.template_schema(slug)
     except clauseai.TemplateNotFoundError as exc:
@@ -44,7 +45,7 @@ async def generate_document(
     format: str = "pdf",
     email: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Fill a template and return the document as base64.
+    """Generate a filled legal document (PDF, ODT, or Markdown) from a template slug and answers. No account required.
 
     Args:
         slug: Template slug from list_templates.

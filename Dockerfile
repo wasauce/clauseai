@@ -17,6 +17,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml README.md uv.lock ./
 COPY clauseai ./clauseai
 COPY templates ./templates
+COPY skills ./skills
+COPY examples ./examples
 
 RUN uv sync --no-dev --frozen
 

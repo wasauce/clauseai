@@ -1,8 +1,22 @@
 # ClauseAI
 
-Fill attorney-drafted [General Legal](https://general.legal) CC0 templates from a short list of questions and download PDF, OpenDocument, or Markdown. No registration is required.
+Generate startup legal documents from attorney-drafted templates: NDAs, MSAs, DPAs, privacy policies, offer letters, and more. Download PDF, ODT, or Markdown through MCP or an agent skill. No account required.
 
-The gallery, JSON API, MCP server, and agent skill all share the same template engine.
+The gallery, JSON API, MCP server, and agent skill all share the same template engine. Templates come from [General Legal](https://general.legal) and are released under CC0.
+
+## Use with an agent
+
+```bash
+npx skills add wasauce/clauseai --skill clauseai
+```
+
+MCP (Streamable HTTP, no account):
+
+```
+https://clauseai.exe.xyz/mcp
+```
+
+Walkthrough: [Generate a mutual NDA from your company details](https://clauseai.exe.xyz/examples/generate-nda.md).
 
 ## Run locally
 
@@ -29,6 +43,8 @@ Open [http://localhost:8000](http://localhost:8000).
 | Generate | `POST /api/templates/{slug}/generate` |
 | Agent skill | `GET /skill.md` |
 | MCP | `/mcp` |
+| Agent index | `GET /llms.txt` |
+| NDA walkthrough | `GET /examples/generate-nda.md` |
 
 ## Tests
 

@@ -625,9 +625,14 @@ def test_skill_and_api_endpoints(simple_client: TestClient) -> None:
     skill = simple_client.get("/skill.md")
     assert skill.status_code == 200
     assert "name: clauseai" in skill.text
-    assert "/api/templates" in skill.text
+    assert (
+        "Generate startup legal documents from attorney-drafted templates"
+        in skill.text
+    )
+    assert "http://testserver/api/templates" in skill.text
     assert "Fill in as many answers as you can yourself" in skill.text
     assert "__omit__" in skill.text
+    assert "https://clauseai.exe.xyz" not in skill.text
 
     well_known = simple_client.get("/.well-known/skills/clauseai/SKILL.md")
     assert well_known.status_code == 200
@@ -645,6 +650,67 @@ def test_skill_and_api_endpoints(simple_client: TestClient) -> None:
     assert schema.status_code == 200
     keys = {field["key"] for field in schema.json()["fields"]}
     assert keys == {"company_name", "effective_date"}
+
+
+def test_gallery_and_wizard_are_indexable(simple_client: TestClient) -> None:
+    """Discoverable HTML pages must not send noindex."""
+    gallery = simple_client.get("/")
+    assert gallery.status_code == 200
+    assert "noindex" not in gallery.text
+    assert "npx skills add wasauce/clauseai --skill clauseai" in gallery.text
+    assert (
+        "Generate startup legal documents from attorney-drafted templates"
+        in gallery.text
+    )
+
+    wizard = simple_client.get("/mutual-nda")
+    assert wizard.status_code == 200
+    assert "noindex" not in wizard.text
+
+
+def test_llms_txt_and_walkthrough(simple_client: TestClient) -> None:
+    """Agents can find the skill, API docs, catalog, and NDA walkthrough."""
+    index = simple_client.get("/llms.txt")
+    assert index.status_code == 200
+    assert "http://testserver/skill.md" in index.text
+    assert "http://testserver/docs" in index.text
+    assert "http://testserver/api/templates" in index.text
+    assert "npx skills add wasauce/clauseai --skill clauseai" in index.text
+
+    walkthrough = simple_client.get("/examples/generate-nda.md")
+    assert walkthrough.status_code == 200
+    assert "Generate a mutual NDA from your company details" in walkthrough.text
+    assert "https://clauseai.exe.xyz/mcp" in walkthrough.text
+    assert "npx skills add wasauce/clauseai --skill clauseai" in walkthrough.text
+
+    robots = simple_client.get("/robots.txt")
+    assert robots.status_code == 200
+    assert "Allow: /" in robots.text
+    assert "Disallow: /health" in robots.text
+
+
+def test_mcp_initialize_without_trailing_slash(simple_client: TestClient) -> None:
+    """Registry listings point at /mcp without a trailing slash."""
+    response = simple_client.post(
+        "/mcp",
+        headers={
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-03-26",
+                "capabilities": {},
+                "clientInfo": {"name": "clauseai-tests", "version": "0.0.1"},
+            },
+        },
+    )
+    assert response.status_code == 200
+    assert "ClauseAI" in response.text
+    assert "0.1.0" in response.text
 
 
 def test_download_without_answers(simple_client: TestClient) -> None:
