@@ -16,6 +16,12 @@ MCP (Streamable HTTP, no account):
 https://clauseai.exe.xyz/mcp
 ```
 
+GrokBot version:
+
+```
+https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R
+```
+
 Walkthrough: [Generate a mutual NDA from your company details](https://clauseai.exe.xyz/examples/generate-nda.md).
 
 ## Run locally

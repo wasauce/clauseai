@@ -15,6 +15,7 @@ from pydantic import BaseModel, EmailStr, Field, ValidationError
 
 from clauseai.config import (
     GITHUB_REPO,
+    GROKBOT_URL,
     LISTING_DESCRIPTION,
     PRODUCTION_BASE_URL,
     SKILL_INSTALL_COMMAND,
@@ -63,6 +64,7 @@ def _page_context(request: Request, **kwargs: Any) -> dict[str, Any]:
         "skill_url": f"{base_url}/skill.md",
         "mcp_url": f"{base_url}/mcp",
         "api_url": f"{base_url}/api/templates",
+        "grokbot_url": GROKBOT_URL,
         "skill_install": SKILL_INSTALL_COMMAND,
         "agent_prompt": (
             f"Read the ClauseAI skill at {base_url}/skill.md "
@@ -203,7 +205,7 @@ def build_llms_txt(base_url: Optional[str] = None) -> str:
             f"> {LISTING_DESCRIPTION}",
             "",
             "ClauseAI fills attorney-drafted General Legal CC0 templates.",
-            "Connect over MCP or install the skill. No account is required.",
+            "Connect over MCP, install the skill, or use the GrokBot. No account is required.",
             "",
             "## Skill and MCP",
             "",
@@ -211,6 +213,7 @@ def build_llms_txt(base_url: Optional[str] = None) -> str:
             f"- [Well-known skill]({root}/.well-known/skills/clauseai/SKILL.md): Installer alias",
             f"- [MCP server]({root}/mcp): Streamable HTTP tools for listing, inspecting, and generating documents",
             f"- [Install the skill]({github}): `{SKILL_INSTALL_COMMAND}`",
+            f"- [GrokBot]({GROKBOT_URL}): GrokBot version of ClauseAI",
             "",
             "## API",
             "",
@@ -221,7 +224,7 @@ def build_llms_txt(base_url: Optional[str] = None) -> str:
             "## Templates",
             "",
             f"- [Gallery]({root}/): Human-readable template catalog",
-            f"- [Generate a mutual NDA]({root}/examples/generate-nda.md): Walkthrough with install command, MCP URL, and sample output",
+            f"- [Generate a mutual NDA]({root}/examples/generate-nda.md): Walkthrough with install command, MCP URL, GrokBot, and sample output",
             "",
             "## Optional",
             "",

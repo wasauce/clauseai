@@ -16,6 +16,12 @@ Or point an MCP client at the hosted Streamable HTTP server:
 https://clauseai.exe.xyz/mcp
 ```
 
+GrokBot version:
+
+```
+https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R
+```
+
 ## MCP flow
 
 1. Call `list_templates` and pick `mutual-nda`.

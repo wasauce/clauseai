@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 
 PRODUCTION_BASE_URL = "https://clauseai.exe.xyz"
+GROKBOT_URL = "https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R"
 GITHUB_REPO = "wasauce/clauseai"
 SKILL_INSTALL_COMMAND = "npx skills add wasauce/clauseai --skill clauseai"
 LISTING_DESCRIPTION = (

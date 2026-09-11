@@ -632,6 +632,7 @@ def test_skill_and_api_endpoints(simple_client: TestClient) -> None:
     assert "http://testserver/api/templates" in skill.text
     assert "Fill in as many answers as you can yourself" in skill.text
     assert "__omit__" in skill.text
+    assert "https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R" in skill.text
     assert "https://clauseai.exe.xyz" not in skill.text
     assert 'description: "Generate startup legal documents' in skill.text
 
@@ -659,6 +660,7 @@ def test_gallery_and_wizard_are_indexable(simple_client: TestClient) -> None:
     assert gallery.status_code == 200
     assert "noindex" not in gallery.text
     assert "npx skills add wasauce/clauseai --skill clauseai" in gallery.text
+    assert "https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R" in gallery.text
     assert (
         "Generate startup legal documents from attorney-drafted templates"
         in gallery.text
@@ -677,12 +679,14 @@ def test_llms_txt_and_walkthrough(simple_client: TestClient) -> None:
     assert "http://testserver/docs" in index.text
     assert "http://testserver/api/templates" in index.text
     assert "npx skills add wasauce/clauseai --skill clauseai" in index.text
+    assert "https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R" in index.text
 
     walkthrough = simple_client.get("/examples/generate-nda.md")
     assert walkthrough.status_code == 200
     assert "Generate a mutual NDA from your company details" in walkthrough.text
     assert "https://clauseai.exe.xyz/mcp" in walkthrough.text
     assert "npx skills add wasauce/clauseai --skill clauseai" in walkthrough.text
+    assert "https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R" in walkthrough.text
 
     robots = simple_client.get("/robots.txt")
     assert robots.status_code == 200

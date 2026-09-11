@@ -18,6 +18,7 @@ immediately.
 - Field schema: `GET https://clauseai.exe.xyz/api/templates/{slug}`
 - Generate: `POST https://clauseai.exe.xyz/api/templates/{slug}/generate`
 - MCP: `https://clauseai.exe.xyz/mcp`
+- GrokBot: `https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R`
 
 ## Generate request
 
