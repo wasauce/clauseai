@@ -633,6 +633,7 @@ def test_skill_and_api_endpoints(simple_client: TestClient) -> None:
     assert "Fill in as many answers as you can yourself" in skill.text
     assert "__omit__" in skill.text
     assert "https://clauseai.exe.xyz" not in skill.text
+    assert 'description: "Generate startup legal documents' in skill.text
 
     well_known = simple_client.get("/.well-known/skills/clauseai/SKILL.md")
     assert well_known.status_code == 200
