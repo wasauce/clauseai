@@ -428,6 +428,48 @@ def test_terms_of_use_honors_governing_state() -> None:
     assert "NY CPLR ARTICLE 75" in filled
 
 
+def test_msa_always_decisionlayer() -> None:
+    """The MSA ships DecisionLayer arbitration instead of AAA."""
+    filled = fill_template(
+        "master-services-agreement",
+        {
+            "company_name": "Acme Inc.",
+            "customer_name": "Globex LLC",
+            "company_email": "legal@acme.com",
+        },
+    )
+    assert filled.count("Acme Inc.") == 3
+    assert filled.count("Globex LLC") == 3
+    assert "DecisionLayer" in filled
+    assert "artificial intelligence" in filled
+    assert "American Arbitration Association" not in filled
+    assert "AAA" not in filled
+    assert "www.adr.org" not in filled
+    assert "New Castle County" not in filled
+    assert "first contact Company at legal@acme.com" in filled
+    assert filled.count("legal@acme.com") == 2
+    assert "injunctive or other equitable relief" in filled
+
+    schema_keys = {
+        field.key for field in load_template("master-services-agreement").manifest.fields
+    }
+    assert "arbitration_venue" not in schema_keys
+    assert "arbitration_forum" not in schema_keys
+
+
+def test_msa_honors_governing_state() -> None:
+    """DecisionLayer NY language covers procedure, not the MSA's governing law."""
+    filled = fill_template(
+        "master-services-agreement",
+        {"governing_state": "California"},
+    )
+    assert "laws of the State of [California]" in filled
+    assert "substantive rights and obligations of the parties shall be governed by the internal laws of the State of New York" not in filled
+    assert "This Arbitration Agreement is governed by the Rules" in filled
+    assert "substantive law governing this Agreement is set out in the Governing Law section" in filled
+    assert "New York State" in filled
+
+
 def test_employee_offer_letter_reuses_employee_name() -> None:
     """One employee_name answer fills the address block and signature."""
     filled = fill_template(

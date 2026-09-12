@@ -2,9 +2,15 @@
   "slug": "master-services-agreement",
   "title": "Master Services Agreement (MSA)",
   "category": "Agreements",
-  "description": "Tech-oriented MSA for companies deploying software and providing platform or integration services.",
+  "description": "Tech-oriented MSA for companies deploying software and providing platform or integration services, with DecisionLayer arbitration for disputes.",
   "when_needed": "When selling software, platform access, or integration services under a master agreement.",
   "source_url": "https://github.com/General-Legal/legal-templates/tree/main/templates/master-services-agreement",
+  "transforms": [
+    {
+      "find": "the parties each agree to resolve such claim exclusively through binding arbitration by the American Arbitration Association (\"**AAA**\") before a single arbitrator (the \"**Arbitrator**\"), under the Expedited Procedures then in effect for AAA (the \"**Rules**\"), except as otherwise provided herein, or as otherwise determined by the Arbitrator.  In the event of any conflict between the Rules and this Arbitration Agreement, this Arbitration Agreement will control.  AAA may be contacted at www.adr.org, where the Rules are also available.  The arbitration will be conducted in [<mark>New Castle County, Delaware</mark>], unless the parties agree otherwise.  Each party will be responsible for paying any AAA filing and administrative and Arbitrator fees in accordance with the Rules, and the award rendered by the Arbitrator will include costs of arbitration, reasonable attorneys' fees, and reasonable costs for expert and other witnesses.  Any judgment on the award rendered by the Arbitrator may be entered in any court of competent jurisdiction.  The parties agree that the Arbitrator, and not any federal, state, or local court or agency, will have exclusive authority to resolve any disputes relating to the scope, interpretation, applicability, enforceability, or formation of this Arbitration Agreement, including any claim that all or any part of this Arbitration Agreement is void or voidable, or relating to any defense to arbitration, including waiver, delay, laches, unconscionability, or estoppel.  The Arbitrator will also be responsible for determining all Company arbitrability issues, including issues relating to contract formation and whether the Agreement, or any provision of the Agreement, are unconscionable or illusory.",
+      "replace": "the parties each agree to the following arbitration agreement (this \"**Arbitration Agreement**\"). Any controversy or claim arising out of or relating to this Agreement, including the interpretation, formation, breach, termination, validity, arbitrability or enforceability thereof, shall be settled by binding arbitration administered by Decision Science Research Corporation (\"**DecisionLayer**\") in accordance with its rules then in effect at https://www.decisionlayer.ai/rules (the \"**Rules**\"). This Arbitration Agreement is governed by the Rules, the Federal Arbitration Act, 9 U.S.C. §§ 1-16 (\"**FAA**\"), applicable federal law, and the internal laws of the State of New York (without reference to conflict-of-law rules). The substantive law governing this Agreement is set out in the Governing Law section. The FAA shall control over any conflicting provision of law with respect to this Arbitration Agreement. Judgment on any arbitration award may be entered in any State or Federal Court located in New York State or any other court of competent jurisdiction. Subject to the Rules, DecisionLayer arbitrations will be conducted by an arbitrator utilizing DecisionLayer artificial intelligence systems or, upon mutual agreement of the parties, by DecisionLayer's artificial intelligence system itself. The parties agree that the arbitrator selection mechanisms set forth in the Rules constitute a substantial and valuable contract right, and the designated administration by DecisionLayer is an essential term of this Agreement. THE PARTIES HERETO WAIVE ANY RIGHT TO A JURY TRIAL AND AGREE THAT ANY CLAIMS ARISING FROM OR RELATED TO THIS AGREEMENT MUST BE BROUGHT IN AN INDIVIDUAL CAPACITY, NOT AS A PLAINTIFF OR CLASS MEMBER IN ANY CLASS OR REPRESENTATIVE PROCEEDING. EACH PARTY CONSENTS TO RECEIVE SERVICE OF PROCESS COMMENCING AN ARBITRATION VIA THE DECISIONLAYER WEBSITE (IF IT HAS AN ACCOUNT), BY EMAIL, BY REGISTERED OR CERTIFIED MAIL, OR IN ACCORDANCE WITH APPLICABLE LAWS. EACH PARTY HERETO WAIVES ANY OBJECTION TO SERVICE BY THESE MEANS. Any arbitration shall be conducted virtually via the DecisionLayer platform. Each litigant's relationship with DecisionLayer is governed by the DecisionLayer Terms of Service available at https://www.decisionlayer.ai/terms. If DecisionLayer is disqualified, unavailable, or otherwise unable to administer or hear any dispute for any reason, the parties shall apply to a court of competent jurisdiction for appointment of an arbitrator pursuant to Section 5 of the Federal Arbitration Act, 9 U.S.C. § 5, and the agreement to arbitrate shall remain fully enforceable. The invalidity of any portion of this Arbitration Agreement shall not affect the validity of any other portion, and any invalid provision shall be modified to the least extent necessary to render it valid."
+    }
+  ],
   "fields": [
     {
       "key": "effective_date",
@@ -20,7 +26,7 @@
       "question": "What is the provider company's name?",
       "type": "text",
       "required": false,
-      "marks": [1, 7, 11]
+      "marks": [1, 6, 10]
     },
     {
       "key": "customer_name",
@@ -28,7 +34,7 @@
       "question": "What is the customer's name?",
       "type": "text",
       "required": false,
-      "marks": [2, 8, 10]
+      "marks": [2, 7, 9]
     },
     {
       "key": "governing_state",
@@ -44,15 +50,7 @@
       "question": "What company email should be used for notices and informal dispute contact?",
       "type": "email",
       "required": false,
-      "marks": [4, 6]
-    },
-    {
-      "key": "arbitration_venue",
-      "label": "Arbitration venue",
-      "question": "Where should arbitration take place (city and state or county)?",
-      "type": "text",
-      "required": false,
-      "marks": [5]
+      "marks": [4, 5]
     }
   ]
 }
