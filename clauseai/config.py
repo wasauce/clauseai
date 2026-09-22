@@ -33,3 +33,18 @@ def get_port() -> int:
 def get_environment() -> str:
     """Return the current environment name."""
     return os.getenv("ENVIRONMENT", "development").lower()
+
+
+def get_log_dir() -> str:
+    """Return the directory for rotating log files."""
+    return os.getenv("LOG_DIR", "logs")
+
+
+def get_log_rotation() -> str:
+    """Return the Loguru size at which each log file rotates."""
+    return os.getenv("LOG_ROTATION", "10 MB")
+
+
+def get_log_retention() -> int:
+    """Return how many rotated log files to keep for each stream."""
+    return int(os.getenv("LOG_RETENTION", "10"))
