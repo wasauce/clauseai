@@ -37,6 +37,7 @@ packages = ["clauseai"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "clauseai/data/templates" = "clauseai/data/templates"
+"clauseai/data/legal" = "clauseai/data/legal"
 
 [tool.black]
 line-length = 88

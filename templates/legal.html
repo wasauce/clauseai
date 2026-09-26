@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+
+{% block main_classes %}bg-gray-50{% endblock %}
+
+{% block content %}
+<style>
+    .legal-doc h1 {
+        font-size: 1.875rem;
+        font-weight: 700;
+        margin: 0 0 1rem;
+        color: #111827;
+    }
+    .legal-doc h2 {
+        font-size: 1.25rem;
+        font-weight: 650;
+        margin: 2rem 0 0.75rem;
+        color: #111827;
+    }
+    .legal-doc p,
+    .legal-doc li {
+        line-height: 1.65;
+    }
+    .legal-doc p {
+        margin: 0.75rem 0;
+    }
+    .legal-doc ul,
+    .legal-doc ol {
+        margin: 0.75rem 0 0.75rem 1.25rem;
+    }
+    .legal-doc li {
+        margin: 0.35rem 0;
+    }
+    .legal-doc a {
+        color: #4338ca;
+        text-decoration: underline;
+    }
+    .legal-doc table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+        margin: 1rem 0;
+    }
+    .legal-doc th,
+    .legal-doc td {
+        border: 1px solid #e5e7eb;
+        padding: 0.5rem;
+        vertical-align: top;
+        text-align: left;
+    }
+    .legal-doc th {
+        background: #f9fafb;
+    }
+    .legal-doc hr {
+        margin: 2rem 0;
+        border: 0;
+        border-top: 1px solid #e5e7eb;
+    }
+</style>
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <article class="legal-doc bg-white rounded-2xl border border-gray-200 p-6 sm:p-10 text-gray-800">
+        {{ body|safe }}
+    </article>
+</div>
+{% endblock %}

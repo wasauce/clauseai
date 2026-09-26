@@ -887,6 +887,48 @@ def test_slack_payload_includes_email() -> None:
     assert fields["Source"] == "web"
 
 
+def test_terms_and_privacy_pages(simple_client: TestClient) -> None:
+    """Published policies are linkable and do not replace the wizards."""
+    terms = simple_client.get("/terms")
+    assert terms.status_code == 200
+    assert "ClauseAI" in terms.text
+    assert "https://clauseai.exe.xyz/privacy" in terms.text
+    assert "does not require an account" in terms.text
+    assert "personal or business use" in terms.text
+    assert "[INSERT" not in terms.text
+    assert "Cookie Policy / Privacy Policy -- hyperlink" not in terms.text
+    assert "Templates are attorney-drafted" not in terms.text
+    assert "noindex" not in terms.text
+
+    privacy = simple_client.get("/privacy")
+    assert privacy.status_code == 200
+    assert "ClauseAI" in privacy.text
+    assert "https://clauseai.exe.xyz/terms" in privacy.text
+    assert "We do not sell your Personal Information" in privacy.text
+    assert "Optional email address" in privacy.text
+    assert "[INSERT" not in privacy.text
+    assert "Cookie Policy / Privacy Policy -- hyperlink" not in privacy.text
+    assert "Templates are attorney-drafted" not in privacy.text
+    assert "noindex" not in privacy.text
+
+    terms_wizard = simple_client.get("/terms-of-use")
+    assert terms_wizard.status_code == 200
+    assert "Download now" in terms_wizard.text
+
+    privacy_wizard = simple_client.get("/privacy-policy-us")
+    assert privacy_wizard.status_code == 200
+    assert "Download now" in privacy_wizard.text
+
+    gallery = simple_client.get("/")
+    assert 'href="/terms"' in gallery.text
+    assert 'href="/privacy"' in gallery.text
+    assert "Templates are attorney-drafted" in gallery.text
+
+    index = simple_client.get("/llms.txt")
+    assert "http://testserver/terms" in index.text
+    assert "http://testserver/privacy" in index.text
+
+
 def test_mcp_list_and_fields_tools() -> None:
     """MCP tools expose the same catalog as the JSON API."""
     templates = list_templates()

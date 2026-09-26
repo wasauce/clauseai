@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
+import markdown
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response
@@ -66,6 +67,7 @@ def _page_context(request: Request, **kwargs: Any) -> dict[str, Any]:
         "api_url": f"{base_url}/api/templates",
         "grokbot_url": GROKBOT_URL,
         "skill_install": SKILL_INSTALL_COMMAND,
+        "show_template_notice": True,
         "agent_prompt": (
             f"Read the ClauseAI skill at {base_url}/skill.md "
             "and follow it to build the legal documents I need. Fill in "
@@ -186,6 +188,7 @@ async def _run_generation(
 
 SKILL_PATH = ROOT_DIR / "skills" / "clauseai" / "SKILL.md"
 WALKTHROUGH_PATH = ROOT_DIR / "examples" / "generate-nda.md"
+LEGAL_DIR = Path(__file__).resolve().parent / "data" / "legal"
 
 
 def build_skill_markdown(base_url: Optional[str] = None) -> str:
@@ -226,11 +229,42 @@ def build_llms_txt(base_url: Optional[str] = None) -> str:
             f"- [Gallery]({root}/): Human-readable template catalog",
             f"- [Generate a mutual NDA]({root}/examples/generate-nda.md): Walkthrough with install command, MCP URL, GrokBot, and sample output",
             "",
+            "## Legal",
+            "",
+            f"- [Terms of Use]({root}/terms): Terms for using ClauseAI",
+            f"- [Privacy Policy]({root}/privacy): How ClauseAI handles personal information",
+            "",
             "## Optional",
             "",
             "- [General Legal templates](https://github.com/General-Legal/legal-templates): Upstream CC0 source",
             "",
         ]
+    )
+
+
+def render_legal_markdown(page: str) -> str:
+    """Render a published terms or privacy page to HTML."""
+    text = (LEGAL_DIR / f"{page}.md").read_text(encoding="utf-8")
+    return markdown.markdown(
+        text,
+        extensions=["tables", "sane_lists", "nl2br"],
+    )
+
+
+def _legal_page(
+    request: Request, *, page: str, title: str, description: str
+) -> HTMLResponse:
+    """Serve one published legal page without the gallery disclaimer."""
+    return templates.TemplateResponse(
+        request,
+        "legal.html",
+        _page_context(
+            request,
+            title=title,
+            description=description,
+            body=render_legal_markdown(page),
+            show_template_notice=False,
+        ),
     )
 
 
@@ -354,7 +388,34 @@ _RESERVED_SLUGS = {
     "docs",
     "redoc",
     "openapi.json",
+    "terms",
+    "privacy",
 }
+
+
+@router.get("/terms", response_class=HTMLResponse, summary="Terms of Use")
+async def terms_page(request: Request) -> HTMLResponse:
+    """Serve ClauseAI's Terms of Use."""
+    return _legal_page(
+        request,
+        page="terms",
+        title="Terms of Use | ClauseAI",
+        description="Terms of Use for the ClauseAI website, API, and MCP server.",
+    )
+
+
+@router.get("/privacy", response_class=HTMLResponse, summary="Privacy Policy")
+async def privacy_page(request: Request) -> HTMLResponse:
+    """Serve ClauseAI's Privacy Policy."""
+    return _legal_page(
+        request,
+        page="privacy",
+        title="Privacy Policy | ClauseAI",
+        description=(
+            "Privacy Policy for ClauseAI, including what the service collects "
+            "and the choices available under U.S. state privacy laws."
+        ),
+    )
 
 
 @router.get("/{slug}", response_class=HTMLResponse, summary="ClauseAI wizard")

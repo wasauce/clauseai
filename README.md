@@ -51,6 +51,8 @@ Open [http://localhost:8000](http://localhost:8000).
 | MCP | `/mcp` |
 | Agent index | `GET /llms.txt` |
 | NDA walkthrough | `GET /examples/generate-nda.md` |
+| Terms of Use | `GET /terms` |
+| Privacy Policy | `GET /privacy` |
 
 ## Tests
 
