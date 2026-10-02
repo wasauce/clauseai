@@ -48,3 +48,20 @@ def get_log_rotation() -> str:
 def get_log_retention() -> int:
     """Return how many rotated log files to keep for each stream."""
     return int(os.getenv("LOG_RETENTION", "10"))
+
+
+_DEV_DOWNLOAD_SIGNING_SECRET = "clauseai-dev-download-secret"
+
+
+def get_download_signing_secret() -> str:
+    """Return the HMAC secret for stateless document download links.
+
+    Production must set DOWNLOAD_SIGNING_SECRET. Other environments use a
+    fixed development secret when the variable is empty.
+    """
+    raw = os.getenv("DOWNLOAD_SIGNING_SECRET", "").strip()
+    if raw:
+        return raw
+    if get_environment() == "production":
+        raise RuntimeError("DOWNLOAD_SIGNING_SECRET is required in production")
+    return _DEV_DOWNLOAD_SIGNING_SECRET

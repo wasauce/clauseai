@@ -159,6 +159,7 @@
       "label": "CCPA personal-information chart",
       "question": "List each category of personal information you collect as markdown table rows. Each row needs five cells: PI category, CCPA statutory category, purposes, parties you disclose it to for a business purpose, and parties you sell or share it with. Example: | Contact data | Identifiers | Service delivery | Service providers | None |",
       "type": "textarea",
+      "max_length": 8000,
       "required": false,
       "marks": [46]
     }

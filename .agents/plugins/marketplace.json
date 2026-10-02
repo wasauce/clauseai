@@ -1,0 +1,20 @@
+{
+  "name": "clauseai",
+  "interface": {
+    "displayName": "ClauseAI"
+  },
+  "plugins": [
+    {
+      "name": "clauseai",
+      "source": {
+        "source": "local",
+        "path": "./plugins/clauseai"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Business & Operations"
+    }
+  ]
+}

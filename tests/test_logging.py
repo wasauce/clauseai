@@ -23,7 +23,10 @@ def test_access_log_records_requests_and_skips_health(
     try:
         response = simple_client.get(
             "/api/templates?email=secret@example.com",
-            headers={"X-Forwarded-For": "203.0.113.8, 10.0.0.1"},
+            headers={
+                "X-Forwarded-For": "203.0.113.8, 10.0.0.1",
+                "User-Agent": "ClauseAITests/1.0",
+            },
         )
         assert response.status_code == 200
         health = simple_client.get("/health")
@@ -36,7 +39,7 @@ def test_access_log_records_requests_and_skips_health(
     lines = [line for line in access_log.splitlines() if line.strip()]
     assert len(lines) == 1
     assert "203.0.113.8 | GET /api/templates | 200 |" in lines[0]
-    assert lines[0].endswith("ms")
+    assert lines[0].endswith("ms | ClauseAITests/1.0")
     assert "secret@example.com" not in access_log
     assert "/health" not in access_log
     app_log = tmp_path / "app.log"

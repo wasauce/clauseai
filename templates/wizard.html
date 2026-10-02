@@ -42,6 +42,7 @@
                 id="field_{{ field.key }}"
                 name="field_{{ field.key }}"
                 rows="3"
+                maxlength="{{ field.max_length }}"
                 class="w-full rounded-lg border-gray-300 border px-3 py-2 text-gray-900"
             ></textarea>
             {% elif field.type == "choice" %}
@@ -80,6 +81,7 @@
                 id="field_{{ field.key }}"
                 name="field_{{ field.key }}"
                 type="text"
+                maxlength="{{ field.max_length }}"
                 class="w-full rounded-lg border-gray-300 border px-3 py-2 text-gray-900"
             >
             {% endif %}

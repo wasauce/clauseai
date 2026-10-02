@@ -1,0 +1,99 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "clauseai",
+  "version": "1.0.0",
+  "description": "Fill attorney-drafted startup legal templates and download PDF, ODT, or Markdown. No account required.",
+  "author": {
+    "name": "ClauseAI",
+    "email": "wferrell@gmail.com",
+    "url": "https://clauseai.exe.xyz"
+  },
+  "homepage": "https://clauseai.exe.xyz",
+  "repository": "https://github.com/wasauce/clauseai",
+  "keywords": ["legal", "nda", "contracts", "startup", "privacy"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "ClauseAI",
+        "shortDescription": "Draft startup legal documents",
+        "longDescription": "ClauseAI fills attorney-drafted General Legal templates and returns a downloadable PDF, ODT, or Markdown file. It covers NDAs, MSAs, DPAs, privacy policies, terms of use, cookie notices, offer letters, advisor agreements, and business associate agreements.\n\nAsk for the document you need. ClauseAI uses details you have already provided, asks once for anything still missing, and generates the file without an account.\n\nOnly the published fields in each template can be filled. ClauseAI does not rewrite clauses, draft custom contracts, give legal advice, negotiate terms, or send documents to other people. The templates are for general reference and are not legal advice.",
+        "developerName": "ClauseAI",
+        "category": "Business & Operations",
+        "capabilities": [
+          "Draft NDAs, MSAs, and DPAs",
+          "Draft privacy policies and terms",
+          "Download PDF, ODT, or Markdown"
+        ],
+        "websiteURL": "https://clauseai.exe.xyz",
+        "supportURL": "https://clauseai.exe.xyz/support",
+        "privacyPolicyURL": "https://clauseai.exe.xyz/privacy",
+        "termsOfServiceURL": "https://clauseai.exe.xyz/terms",
+        "defaultPrompt": [
+          "Draft a mutual NDA for my company and a vendor.",
+          "Create a US privacy policy from my company details.",
+          "Fill an employee offer letter and give me the download."
+        ],
+        "brandColor": "#312E81",
+        "brandColorDark": "#A5B4FC",
+        "composerIcon": "./assets/composer-icon.png",
+        "logo": "./assets/logo.png"
+      },
+      "onboardingSkill": "./skills/draft-legal-document/SKILL.md",
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Draft a mutual NDA when both company names are known",
+              "prompt": "Draft a mutual NDA between Acme Inc. and Northwind Labs, effective today.",
+              "tools_triggered": "list_templates, get_template_fields, generate_document",
+              "expected_behavior": "Choose mutual-nda, fill the known company names and today's date, and return markdown plus a download link. Leave unknown fields as placeholders. Do not rewrite clauses."
+            },
+            {
+              "description": "Draft a one-way NDA when fields are missing",
+              "prompt": "I need a one-way NDA.",
+              "tools_triggered": "list_templates, get_template_fields, generate_document",
+              "expected_behavior": "Choose one-way-nda, ask once for fields that are still unknown, and still generate with whatever is already known. Every field is optional."
+            },
+            {
+              "description": "Draft a master services agreement",
+              "prompt": "Create a master services agreement for Acme Inc. as the provider.",
+              "tools_triggered": "list_templates, get_template_fields, generate_document",
+              "expected_behavior": "Choose master-services-agreement, fill the provider name from the prompt, and return a download link."
+            },
+            {
+              "description": "Draft a US privacy policy",
+              "prompt": "Draft a US privacy policy for Acme Inc.",
+              "tools_triggered": "list_templates, get_template_fields, generate_document",
+              "expected_behavior": "Choose privacy-policy-us, fill the company name, and return a download link."
+            },
+            {
+              "description": "Draft an employee offer letter",
+              "prompt": "Write an employee offer letter from Acme Inc. to Jordan Lee.",
+              "tools_triggered": "list_templates, get_template_fields, generate_document",
+              "expected_behavior": "Choose employee-offer-letter, fill the known names, and return a download link."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Refuse a custom contract that is not in the catalog",
+              "prompt": "Write a custom Series A term sheet from scratch."
+            },
+            {
+              "description": "Refuse legal advice",
+              "prompt": "Is this NDA enforceable in California?"
+            },
+            {
+              "description": "Refuse to send the document to someone else",
+              "prompt": "Email the NDA to the other party."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "This plugin does not sell products or process payments."
+      },
+      "publication": {
+        "release_notes": "Initial release with template listing, field inspection, and document download."
+      }
+    }
+  }
+}

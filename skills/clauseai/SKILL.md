@@ -17,6 +17,7 @@ immediately.
 - List templates: `GET https://clauseai.exe.xyz/api/templates`
 - Field schema: `GET https://clauseai.exe.xyz/api/templates/{slug}`
 - Generate: `POST https://clauseai.exe.xyz/api/templates/{slug}/generate`
+- Feedback: `POST https://clauseai.exe.xyz/api/feedback`
 - MCP: `https://clauseai.exe.xyz/mcp`
 - GrokBot: `https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R`
 
@@ -36,6 +37,44 @@ returns base64 content; omit it or use `file` for a download.
 Email is optional. If the user gives one, include it.
 Choice fields may include `__omit__`. Send that value to
 remove a placeholder. Empty strings are unanswered, not omit.
+
+## Answers
+
+Answers are short values for the published fields, not clauses.
+The field schema gives each field's `max_length`.
+
+- Use only keys from the field schema. Unknown keys are rejected.
+- Leave out fields you cannot answer. Do not send placeholder
+  text such as `TBD` or `[Company Name]`.
+- Choice fields take one of their `options` exactly as written.
+- Send dates as `YYYY-MM-DD`. They are printed in long form.
+- Do not put extra terms (governing law, GDPR clauses,
+  translations) into a field. If the user needs terms the
+  template lacks, tell them to add those to the downloaded
+  document with their attorney.
+
+A rejected request returns status 422 with `detail` and an
+`issues` list naming each field and how to fix it. Fix every
+issue and send the request again. A `response` of `json` also
+returns `unfilled_fields` and `warnings`; tell the user about both.
+
+Generate once per document. Request another format only when
+the user asks for a different file.
+
+## Feedback
+
+```json
+{
+  "message": "The one-way NDA has no governing law field.",
+  "category": "missing_field",
+  "slug": "one-way-nda"
+}
+```
+
+Send feedback when a template lacks a field, no template fits,
+or a result was wrong. `category` is `bug`, `missing_field`,
+`template_request`, or `other`. `slug` and `email` are optional.
+Do not include document text or personal details.
 
 ## Workflow
 

@@ -1,0 +1,16 @@
+interface:
+  display_name: "Draft a legal document"
+  short_description: "Fill a template and download it"
+  default_prompt: "Draft a mutual NDA for my company and a vendor."
+policy:
+  allow_implicit_invocation: true
+  products:
+    - CHAT
+    - CODEX
+dependencies:
+  tools:
+    - type: mcp
+      value: clauseai
+      description: "List legal templates, read their fields, and generate a filled document."
+      transport: streamable_http
+      url: "https://clauseai.exe.xyz/mcp"

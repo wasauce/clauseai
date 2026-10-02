@@ -3,19 +3,30 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
 import html
 import json
 import os
 import re
 import shutil
 import tempfile
+import time
+from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import (
+    BaseModel,
+    EmailStr,
+    Field,
+    TypeAdapter,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from clauseai.log import get_logger
 
@@ -36,8 +47,36 @@ MEDIA_TYPES = {
 OMIT_ANSWER = "__omit__"
 
 
+# Default answer length caps by field type. A manifest field may override
+# its own cap with max_length. Choice answers must match an option instead.
+DEFAULT_MAX_LENGTHS = {"text": 300, "textarea": 2000, "email": 254, "date": 60}
+MAX_REPORTED_ISSUES = 20
+
+FEEDBACK_CATEGORIES = ("bug", "missing_field", "template_request", "other")
+FEEDBACK_MAX_LENGTH = 4000
+FEEDBACK_RATE_LIMIT = 5
+FEEDBACK_RATE_WINDOW_SECONDS = 600
+FEEDBACK_RECEIVED = (
+    "Feedback received. Nobody replies through this channel, so do not "
+    "wait for a response or send the same feedback again."
+)
+
+_ISO_DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
+_PLACEHOLDER_RE = re.compile(
+    r"\[[^\]\n]{2,}\]"
+    r"|\b(?:placeholder|platzhalter|tbd|tba|lorem ipsum"
+    r"|to be (?:determined|confirmed|decided))\b",
+    re.IGNORECASE,
+)
+_EMAIL_ADAPTER = TypeAdapter(EmailStr)
+
+
 class ClauseAIError(Exception):
-    """Base error for ClauseAI operations."""
+    """Base error for ClauseAI operations.
+
+    Messages are read by AI agents as well as people: each one says what
+    was wrong, what is valid, and what to do next.
+    """
 
 
 class TemplateNotFoundError(ClauseAIError):
@@ -52,6 +91,56 @@ class RenderUnavailableError(ClauseAIError):
     """Raised when a renderer dependency is missing."""
 
 
+class InvalidEmailError(ClauseAIError):
+    """Raised when the optional contact email is not an address."""
+
+
+class InvalidFeedbackError(ClauseAIError):
+    """Raised when a feedback submission cannot be accepted."""
+
+
+class FeedbackRateLimitError(ClauseAIError):
+    """Raised when one caller sends feedback too quickly."""
+
+    def __init__(self, retry_after: int) -> None:
+        self.retry_after = retry_after
+        super().__init__(
+            f"Feedback limit reached ({FEEDBACK_RATE_LIMIT} messages per "
+            f"{FEEDBACK_RATE_WINDOW_SECONDS // 60} minutes). Earlier feedback "
+            f"was received. Wait {retry_after} seconds before sending more, "
+            "and do not retry in a loop."
+        )
+
+
+class InvalidAnswersError(ClauseAIError):
+    """Raised when submitted answers cannot be used to fill a template.
+
+    ``issues`` holds one ``{"field", "code", "message"}`` dict per problem
+    so a caller can fix everything in a single retry.
+    """
+
+    def __init__(self, slug: str, issues: list[dict[str, str]]) -> None:
+        self.slug = slug
+        self.issues = issues
+        shown = issues[:MAX_REPORTED_ISSUES]
+        count = len(issues)
+        noun = "answer needs" if count == 1 else "answers need"
+        lines = [
+            f"No document was generated for {slug}: {count} {noun} fixing. "
+            "Fix every item below, then send the request again."
+        ]
+        lines.extend(f"- {issue['field']}: {issue['message']}" for issue in shown)
+        if count > len(shown):
+            lines.append(f"- ...and {count - len(shown)} more.")
+        lines.append(
+            "Field schema: get_template_fields (MCP) or "
+            f"GET /api/templates/{slug}. If the template lacks a field the "
+            "user needs, report it with send_feedback (MCP) or "
+            "POST /api/feedback."
+        )
+        super().__init__("\n".join(lines))
+
+
 class TemplateField(BaseModel):
     """One wizard question, optionally mapped to <mark> indices."""
 
@@ -63,11 +152,22 @@ class TemplateField(BaseModel):
     options: list[str] = Field(default_factory=list)
     marks: list[int] = Field(default_factory=list)
     replaces: str = ""
+    max_length: int | None = None
 
     @field_validator("options")
     @classmethod
     def _normalize_omit_options(cls, options: list[str]) -> list[str]:
         return [OMIT_ANSWER if not option.strip() else option for option in options]
+
+    @model_validator(mode="after")
+    def _default_max_length(self) -> "TemplateField":
+        if self.type == "choice":
+            self.max_length = None
+        elif self.max_length is None:
+            self.max_length = DEFAULT_MAX_LENGTHS.get(
+                self.type, DEFAULT_MAX_LENGTHS["text"]
+            )
+        return self
 
 
 class TemplateTransform(BaseModel):
@@ -139,7 +239,7 @@ def load_template(slug: str) -> LoadedTemplate:
     manifest_path = dest / "manifest.json"
     template_path = dest / "template.md"
     if not manifest_path.exists() or not template_path.exists():
-        raise TemplateNotFoundError(f"Unknown template: {slug}")
+        raise TemplateNotFoundError(_unknown_template_message(slug))
 
     manifest = TemplateManifest.model_validate(
         json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -152,6 +252,29 @@ def load_template(slug: str) -> LoadedTemplate:
         markdown=markdown,
         mark_count=mark_count,
     )
+
+
+def _unknown_template_message(slug: str) -> str:
+    """Name the valid slugs so a caller can retry without another lookup."""
+    known = list_template_slugs()
+    message = f"Unknown template: {_quote(slug)}."
+    close = difflib.get_close_matches(str(slug).lower(), known, n=1)
+    if close:
+        message += f" Did you mean {close[0]}?"
+    if known:
+        message += f" Available slugs: {', '.join(known)}."
+    return (
+        message + " If none fits, tell the user ClauseAI has no template "
+        "for this instead of substituting another document."
+    )
+
+
+def _quote(value: object, limit: int = 60) -> str:
+    """Repr a caller-supplied value, shortened for error text and logs."""
+    text = str(value)
+    if len(text) > limit:
+        text = text[:limit] + "..."
+    return repr(text)
 
 
 def _apply_transforms(manifest: TemplateManifest, markdown: str) -> str:
@@ -278,7 +401,7 @@ def normalize_format(fmt: str | None) -> FormatName:
         return "markdown"
     if value not in SUPPORTED_FORMATS:
         raise InvalidFormatError(
-            f"Unsupported format: {fmt}. Use pdf, odt, or markdown."
+            f"Unsupported format: {_quote(fmt)}. Use pdf, odt, or markdown."
         )
     return value  # type: ignore[return-value]
 
@@ -302,13 +425,15 @@ async def _render_pdf(markdown: str) -> bytes:
 def _render_odt(markdown: str) -> bytes:
     if shutil.which("pandoc") is None:
         raise RenderUnavailableError(
-            "ODT export requires the pandoc binary to be installed."
+            "ODT export is unavailable on this server (pandoc is not "
+            "installed). Retrying will not help; use format pdf or markdown."
         )
     try:
         import pypandoc
     except ImportError as exc:
         raise RenderUnavailableError(
-            "ODT export requires the pypandoc package."
+            "ODT export is unavailable on this server (pypandoc is not "
+            "installed). Retrying will not help; use format pdf or markdown."
         ) from exc
 
     handle = tempfile.NamedTemporaryFile(suffix=".odt", delete=False)
@@ -326,7 +451,9 @@ def _render_odt(markdown: str) -> bytes:
             return handle.read()
     except Exception as exc:
         logger.exception("ODT conversion failed")
-        raise RenderUnavailableError(f"ODT conversion failed: {exc}") from exc
+        raise RenderUnavailableError(
+            f"ODT conversion failed: {exc}. Use format pdf or markdown instead."
+        ) from exc
     finally:
         try:
             os.unlink(output_path)
@@ -373,6 +500,225 @@ def answered_fields(slug: str, answers: dict[str, Any] | None) -> dict[str, str]
     return cleaned
 
 
+def _issue(field: str, code: str, message: str) -> dict[str, str]:
+    return {"field": field, "code": code, "message": message}
+
+
+def _long_date(value: date) -> str:
+    return f"{value.strftime('%B')} {value.day}, {value.year}"
+
+
+def _parse_iso_date(value: str) -> date | None:
+    """Return a date for YYYY-MM-DD text, or None when it is not ISO shaped.
+
+    Raises ValueError when the text is ISO shaped but not a real date.
+    """
+    match = _ISO_DATE_RE.match(value)
+    if not match:
+        return None
+    year, month, day = (int(part) for part in match.groups())
+    return date(year, month, day)
+
+
+def _match_option(field: TemplateField, value: str) -> str | None:
+    """Return the published option a choice answer refers to, if any."""
+    if value in field.options:
+        return value
+    folded = " ".join(value.split()).casefold()
+    for option in field.options:
+        if " ".join(option.split()).casefold() == folded:
+            return option
+    return None
+
+
+def _describe_options(field: TemplateField) -> str:
+    described = []
+    for option in field.options:
+        if option == OMIT_ANSWER:
+            described.append(f'"{OMIT_ANSWER}" (removes the clause)')
+        else:
+            described.append(f'"{option}"')
+    return "; ".join(described)
+
+
+def validate_answers(slug: str, answers: dict[str, Any] | None) -> dict[str, str]:
+    """Return answers ready to fill a template, or raise InvalidAnswersError.
+
+    Empty answers are dropped as unanswered. ISO dates become long-form
+    dates. Every problem is collected so one retry can fix them all.
+    """
+    manifest = load_template(slug).manifest
+    fields = {field.key: field for field in manifest.fields}
+    valid_keys = ", ".join(fields)
+    issues: list[dict[str, str]] = []
+    cleaned: dict[str, str] = {}
+
+    for key, raw in (answers or {}).items():
+        field = fields.get(str(key))
+        if field is None:
+            message = f"not a field on this template. Valid keys: {valid_keys}."
+            close = difflib.get_close_matches(str(key), list(fields), n=1)
+            if close:
+                message += f" Did you mean {close[0]}?"
+            message += (
+                " Remove this key. Templates are fixed text, so terms without "
+                "a field cannot be added here; tell the user to add them to "
+                "the downloaded document with their attorney."
+            )
+            issues.append(_issue(str(key)[:60], "unknown_field", message))
+            continue
+        if raw is None:
+            continue
+        if isinstance(raw, bool) or not isinstance(raw, (str, int, float)):
+            issues.append(
+                _issue(
+                    field.key,
+                    "wrong_type",
+                    f"must be a string, got {type(raw).__name__}. "
+                    f'Send plain text answering "{field.question}"',
+                )
+            )
+            continue
+        value = str(raw).strip()
+        if not value:
+            continue
+        problem = _check_answer(field, value)
+        if isinstance(problem, dict):
+            issues.append(problem)
+        else:
+            cleaned[field.key] = problem
+
+    if issues:
+        raise InvalidAnswersError(slug, issues)
+    # Manifest order keeps logs and download tokens stable.
+    return {key: cleaned[key] for key in fields if key in cleaned}
+
+
+def _check_answer(field: TemplateField, value: str) -> str | dict[str, str]:
+    """Return the cleaned value for one answer, or an issue describing it."""
+    if field.type == "choice":
+        option = _match_option(field, value)
+        if option is None:
+            return _issue(
+                field.key,
+                "invalid_choice",
+                f"{_quote(value)} is not one of this field's options. Send one "
+                f"option exactly as written: {_describe_options(field)}. Omit "
+                "the field to leave a placeholder for the user to decide.",
+            )
+        return option
+
+    limit = field.max_length or DEFAULT_MAX_LENGTHS["text"]
+    if len(value) > limit:
+        return _issue(
+            field.key,
+            "too_long",
+            f"{len(value)} characters; the limit is {limit}. This field "
+            f'fills a short blank answering "{field.question}" Send only '
+            "that value. Templates are fixed text: extra clauses, "
+            "definitions, governing law, or translations cannot be added "
+            "through a field. Tell the user that other terms must be added "
+            "to the downloaded document by them or their attorney.",
+        )
+
+    if field.type == "email":
+        try:
+            _EMAIL_ADAPTER.validate_python(value)
+        except ValidationError:
+            return _issue(
+                field.key,
+                "invalid_email",
+                f"{_quote(value)} is not an email address. Send one address "
+                "such as privacy@example.com, or omit the field.",
+            )
+        return value
+
+    if field.type == "date":
+        try:
+            parsed = _parse_iso_date(value)
+        except ValueError:
+            return _issue(
+                field.key,
+                "invalid_date",
+                f"{_quote(value)} is not a real calendar date. Send "
+                "YYYY-MM-DD (for example 2026-01-31) or a written date.",
+            )
+        if parsed is not None:
+            return _long_date(parsed)
+    return value
+
+
+def answer_warnings(slug: str, answers: dict[str, Any] | None) -> list[str]:
+    """Return notes about accepted answers the caller should double-check.
+
+    Pass the answers as submitted, so ISO dates can still be read.
+    """
+    manifest = load_template(slug).manifest
+    today = datetime.now(timezone.utc).date()
+    warnings: list[str] = []
+    for field in manifest.fields:
+        raw = (answers or {}).get(field.key)
+        if not isinstance(raw, (str, int, float)) or isinstance(raw, bool):
+            continue
+        value = str(raw).strip()
+        if not value or field.type == "choice":
+            continue
+        if _PLACEHOLDER_RE.search(value):
+            warnings.append(
+                f"{field.key} looks like placeholder text ({_quote(value)}) "
+                "and was printed in the document as written. If the real "
+                "value is unknown, ask the user or omit the field so the "
+                "template's own placeholder is kept."
+            )
+        if field.type == "date":
+            try:
+                parsed = _parse_iso_date(value)
+            except ValueError:
+                parsed = None
+            if parsed is not None and (today - parsed).days > 365:
+                warnings.append(
+                    f"{field.key} is {_long_date(parsed)}, more than a year "
+                    f"before today ({_long_date(today)}). Confirm the date "
+                    "with the user unless they gave it to you."
+                )
+    return warnings
+
+
+def unfilled_fields(slug: str, answers: dict[str, str] | None) -> list[str]:
+    """Return field keys still showing a placeholder in the document."""
+    manifest = load_template(slug).manifest
+    given = answers or {}
+    missing: list[str] = []
+    for field in manifest.fields:
+        if field.key in given:
+            continue
+        if field.replaces and not any(
+            field.replaces in value for value in given.values()
+        ):
+            # Companion text for a choice the caller did not pick.
+            continue
+        missing.append(field.key)
+    return missing
+
+
+def normalize_email(raw: str | None) -> str | None:
+    """Return the optional contact email, or raise InvalidEmailError."""
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if not value:
+        return None
+    try:
+        _EMAIL_ADAPTER.validate_python(value)
+    except ValidationError:
+        raise InvalidEmailError(
+            f"Invalid email address: {_quote(value)}. email is optional: "
+            "send one address such as founder@example.com, or leave it out. "
+            "Do not invent an address for the user."
+        ) from None
+    return value
+
+
 def generation_payload(
     *,
     slug: str,
@@ -382,10 +728,13 @@ def generation_payload(
     source: str,
     ip_address: str | None,
     user_agent: str | None,
+    mcp_client: str | None = None,
+    mcp_client_version: str | None = None,
+    origin: str | None = None,
 ) -> dict[str, Any]:
     """Build the shared log / Slack payload for a generation."""
     loaded = load_template(slug)
-    return {
+    payload: dict[str, Any] = {
         "template_slug": slug,
         "template_title": loaded.manifest.title,
         "format": fmt,
@@ -394,14 +743,19 @@ def generation_payload(
         "email": email or None,
         "ip_address": ip_address,
         "user_agent": user_agent,
+        "mcp_client": mcp_client or None,
+        "mcp_client_version": mcp_client_version or None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    if origin:
+        payload["origin"] = origin
+    return payload
 
 
 async def record_generation(*, payload: dict[str, Any]) -> None:
     """Log a generation to loguru and optionally Slack."""
     email = payload.get("email")
-    logger.info(
+    message = (
         "ClauseAI document generated: "
         f"slug={payload.get('template_slug')} "
         f"format={payload.get('format')} "
@@ -409,19 +763,164 @@ async def record_generation(*, payload: dict[str, Any]) -> None:
         f"email={email or 'none'} "
         f"answers={payload.get('answers')}"
     )
+    logger.info(message + _caller_suffix(payload))
 
     from clauseai.notify import notify_generation
 
+    await _notify_in_background(notify_generation, payload)
+
+
+def _caller_suffix(payload: dict[str, Any]) -> str:
+    """Format who made a request for a log line."""
+    suffix = ""
+    client = payload.get("mcp_client")
+    if client:
+        suffix += f" client={client}"
+        version = payload.get("mcp_client_version")
+        if version:
+            suffix += f" version={version}"
+    if payload.get("origin"):
+        suffix += f" origin={payload.get('origin')}"
+    if payload.get("ip_address"):
+        suffix += f" ip={payload.get('ip_address')}"
+    if payload.get("user_agent"):
+        user_agent = " ".join(str(payload["user_agent"]).split())
+        suffix += f" ua={user_agent[:200]!r}"
+    return suffix
+
+
+_background_tasks: set[asyncio.Task[None]] = set()
+
+
+async def _notify_in_background(notify, payload: dict[str, Any]) -> None:
+    """Send a Slack notification without delaying the response."""
+
     async def _notify() -> None:
         try:
-            await notify_generation(payload)
+            await notify(payload)
         except Exception:
             logger.exception("Failed to send ClauseAI Slack notification")
 
     try:
-        asyncio.get_running_loop().create_task(_notify())
+        task = asyncio.get_running_loop().create_task(_notify())
     except RuntimeError:
         await _notify()
+        return
+    # The loop keeps only weak references to tasks.
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
+def log_rejected_generation(
+    exc: InvalidAnswersError,
+    *,
+    source: str,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+    mcp_client: str | None = None,
+    mcp_client_version: str | None = None,
+    origin: str | None = None,
+) -> None:
+    """Log which answers were refused, without the answer text."""
+    issues = ",".join(f"{issue['field']}:{issue['code']}" for issue in exc.issues)
+    caller = {
+        "ip_address": ip_address,
+        "user_agent": user_agent,
+        "mcp_client": mcp_client,
+        "mcp_client_version": mcp_client_version,
+        "origin": origin,
+    }
+    logger.warning(
+        f"ClauseAI generation rejected: slug={exc.slug} source={source} "
+        f"issues={issues}" + _caller_suffix(caller)
+    )
+
+
+_feedback_times: dict[str, deque[float]] = {}
+
+
+def check_feedback_rate(ip_address: str | None, *, now: float | None = None) -> None:
+    """Allow a few feedback messages per caller per window, in memory."""
+    current = time.monotonic() if now is None else now
+    cutoff = current - FEEDBACK_RATE_WINDOW_SECONDS
+    for key in [key for key, times in _feedback_times.items() if times[-1] <= cutoff]:
+        del _feedback_times[key]
+    times = _feedback_times.setdefault(ip_address or "unknown", deque())
+    while times and times[0] <= cutoff:
+        times.popleft()
+    if len(times) >= FEEDBACK_RATE_LIMIT:
+        raise FeedbackRateLimitError(
+            max(1, int(times[0] + FEEDBACK_RATE_WINDOW_SECONDS - current) + 1)
+        )
+    times.append(current)
+
+
+def feedback_payload(
+    *,
+    message: str | None,
+    category: str | None,
+    slug: str | None,
+    email: str | None,
+    source: str,
+    ip_address: str | None,
+    user_agent: str | None,
+    mcp_client: str | None = None,
+    mcp_client_version: str | None = None,
+    origin: str | None = None,
+) -> dict[str, Any]:
+    """Validate a feedback submission and build its log / Slack payload."""
+    text = str(message or "").strip()
+    if not text:
+        raise InvalidFeedbackError(
+            "message is required. Say what you were trying to do, which "
+            "template you used, and what went wrong or was missing."
+        )
+    if len(text) > FEEDBACK_MAX_LENGTH:
+        raise InvalidFeedbackError(
+            f"message is {len(text)} characters; the limit is "
+            f"{FEEDBACK_MAX_LENGTH}. Summarize the problem and leave out "
+            "document text and personal details."
+        )
+    kind = str(category or "other").strip().lower() or "other"
+    if kind not in FEEDBACK_CATEGORIES:
+        raise InvalidFeedbackError(
+            f"Unknown category: {_quote(kind)}. Use one of "
+            f"{', '.join(FEEDBACK_CATEGORIES)}, or leave it out."
+        )
+    template_slug = str(slug or "").strip() or None
+    if template_slug is not None:
+        template_slug = load_template(template_slug).manifest.slug
+    payload: dict[str, Any] = {
+        "message": text,
+        "category": kind,
+        "template_slug": template_slug,
+        "source": source,
+        "email": normalize_email(email),
+        "ip_address": ip_address,
+        "user_agent": user_agent,
+        "mcp_client": mcp_client or None,
+        "mcp_client_version": mcp_client_version or None,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if origin:
+        payload["origin"] = origin
+    return payload
+
+
+async def record_feedback(*, payload: dict[str, Any]) -> None:
+    """Log feedback to loguru and post it to Slack when configured."""
+    logger.info(
+        "ClauseAI feedback received: "
+        f"category={payload.get('category')} "
+        f"slug={payload.get('template_slug') or 'none'} "
+        f"source={payload.get('source')} "
+        f"email={payload.get('email') or 'none'} "
+        f"message={payload.get('message')!r}" + _caller_suffix(payload)
+    )
+
+    from clauseai.notify import notify_feedback
+
+    await _notify_in_background(notify_feedback, payload)
 
 
 def summarize_templates() -> list[dict[str, Any]]:

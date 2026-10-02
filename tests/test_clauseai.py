@@ -6,15 +6,31 @@ import asyncio
 import base64
 import os
 import shutil
+import time
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from clauseai.mcp import get_template_fields, list_templates
-from clauseai.notify import build_slack_message, notify_generation
+from fastmcp.exceptions import ToolError
+
+from clauseai import service
+from clauseai.mcp import (
+    generate_document as mcp_generate_document,
+    get_template_fields,
+    list_templates,
+    send_feedback,
+)
+from clauseai.notify import (
+    build_feedback_slack_message,
+    build_slack_message,
+    notify_generation,
+)
 from clauseai.service import (
     OMIT_ANSWER,
+    FeedbackRateLimitError,
+    InvalidAnswersError,
+    InvalidFeedbackError,
     InvalidFormatError,
     TemplateField,
     TemplateNotFoundError,
@@ -27,6 +43,8 @@ from clauseai.service import (
     normalize_format,
     record_generation,
     render_document,
+    unfilled_fields,
+    validate_answers,
 )
 
 CCPA_TABLE_SKELETON = "| [INSERT] | [INSERT] | [INSERT] | [INSERT] | [INSERT] |"
@@ -451,7 +469,8 @@ def test_msa_always_decisionlayer() -> None:
     assert "injunctive or other equitable relief" in filled
 
     schema_keys = {
-        field.key for field in load_template("master-services-agreement").manifest.fields
+        field.key
+        for field in load_template("master-services-agreement").manifest.fields
     }
     assert "arbitration_venue" not in schema_keys
     assert "arbitration_forum" not in schema_keys
@@ -464,9 +483,15 @@ def test_msa_honors_governing_state() -> None:
         {"governing_state": "California"},
     )
     assert "laws of the State of [California]" in filled
-    assert "substantive rights and obligations of the parties shall be governed by the internal laws of the State of New York" not in filled
+    assert (
+        "substantive rights and obligations of the parties shall be governed by the internal laws of the State of New York"
+        not in filled
+    )
     assert "This Arbitration Agreement is governed by the Rules" in filled
-    assert "substantive law governing this Agreement is set out in the Governing Law section" in filled
+    assert (
+        "substantive law governing this Agreement is set out in the Governing Law section"
+        in filled
+    )
     assert "New York State" in filled
 
 
@@ -668,8 +693,7 @@ def test_skill_and_api_endpoints(simple_client: TestClient) -> None:
     assert skill.status_code == 200
     assert "name: clauseai" in skill.text
     assert (
-        "Generate startup legal documents from attorney-drafted templates"
-        in skill.text
+        "Generate startup legal documents from attorney-drafted templates" in skill.text
     )
     assert "http://testserver/api/templates" in skill.text
     assert "Fill in as many answers as you can yourself" in skill.text
@@ -736,15 +760,34 @@ def test_llms_txt_and_walkthrough(simple_client: TestClient) -> None:
     assert "Disallow: /health" in robots.text
 
 
+_MCP_HEADERS = {
+    "Accept": "application/json, text/event-stream",
+    "Content-Type": "application/json",
+}
+
+
+def _mcp_post(
+    client: TestClient,
+    body: dict,
+    *,
+    session_id: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+):
+    """POST one MCP JSON-RPC message, keeping the streamable HTTP session."""
+    headers = dict(_MCP_HEADERS)
+    if session_id:
+        headers["mcp-session-id"] = session_id
+        headers["mcp-protocol-version"] = "2025-03-26"
+    if extra_headers:
+        headers.update(extra_headers)
+    return client.post("/mcp", headers=headers, json=body)
+
+
 def test_mcp_initialize_without_trailing_slash(simple_client: TestClient) -> None:
     """Registry listings point at /mcp without a trailing slash."""
-    response = simple_client.post(
-        "/mcp",
-        headers={
-            "Accept": "application/json, text/event-stream",
-            "Content-Type": "application/json",
-        },
-        json={
+    response = _mcp_post(
+        simple_client,
+        {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
@@ -758,6 +801,78 @@ def test_mcp_initialize_without_trailing_slash(simple_client: TestClient) -> Non
     assert response.status_code == 200
     assert "ClauseAI" in response.text
     assert "0.1.0" in response.text
+
+
+def test_mcp_generate_records_declared_client(simple_client: TestClient) -> None:
+    """A later tool call records the clientInfo from initialize."""
+    from loguru import logger
+
+    recorded: dict = {}
+    connected: list[str] = []
+    sink = logger.add(
+        lambda message: connected.append(message.record["message"]),
+        level="INFO",
+    )
+
+    async def _record(*, payload: dict) -> None:
+        recorded["payload"] = payload
+
+    caller_headers = {
+        "User-Agent": "ClauseAITests/1.0",
+        "Origin": "https://example.test",
+        "X-Forwarded-For": "203.0.113.44",
+    }
+    try:
+        initialize = _mcp_post(
+            simple_client,
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-03-26",
+                    "capabilities": {},
+                    "clientInfo": {"name": "clauseai-tests", "version": "0.0.1"},
+                },
+            },
+            extra_headers=caller_headers,
+        )
+        assert initialize.status_code == 200
+        session_id = initialize.headers.get("mcp-session-id")
+        assert session_id
+
+        with patch("clauseai.mcp.clauseai.record_generation", new=_record):
+            generated = _mcp_post(
+                simple_client,
+                {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "generate_document",
+                        "arguments": {
+                            "slug": "mutual-nda",
+                            "format": "markdown",
+                            "answers": {},
+                        },
+                    },
+                },
+                session_id=session_id,
+                extra_headers=caller_headers,
+            )
+    finally:
+        logger.remove(sink)
+
+    assert generated.status_code == 200, generated.text
+    assert "mutual-nda.md" in generated.text
+    assert "MCP client connected: name=clauseai-tests version=0.0.1" in connected
+    payload = recorded["payload"]
+    assert payload["source"] == "mcp"
+    assert payload["mcp_client"] == "clauseai-tests"
+    assert payload["mcp_client_version"] == "0.0.1"
+    assert payload["user_agent"] == "ClauseAITests/1.0"
+    assert payload["origin"] == "https://example.test"
+    assert payload["ip_address"] == "203.0.113.44"
 
 
 def test_download_without_answers(simple_client: TestClient) -> None:
@@ -885,6 +1000,77 @@ def test_slack_payload_includes_email() -> None:
     assert fields["Email"] == "counsel@example.com"
     assert "Acme Inc." in fields["Answers"]
     assert fields["Source"] == "web"
+    assert "Client" not in fields
+    assert "Origin" not in fields
+    assert payload["mcp_client"] is None
+    assert "origin" not in payload
+
+
+def test_generation_payload_includes_mcp_client() -> None:
+    """MCP generations keep the declared client, version, and origin."""
+    payload = generation_payload(
+        slug="mutual-nda",
+        fmt="markdown",
+        answers={},
+        email=None,
+        source="mcp",
+        ip_address="203.0.113.10",
+        user_agent="claude-code/1.0.5 (cli)",
+        mcp_client="claude-code",
+        mcp_client_version="1.0.5",
+        origin="https://claude.ai",
+    )
+    assert payload["mcp_client"] == "claude-code"
+    assert payload["mcp_client_version"] == "1.0.5"
+    assert payload["origin"] == "https://claude.ai"
+    assert payload["user_agent"] == "claude-code/1.0.5 (cli)"
+    assert payload["ip_address"] == "203.0.113.10"
+
+    message = build_slack_message(payload)
+    raw_fields = message["attachments"][0]["fields"]
+    fields = {field["title"]: field["value"] for field in raw_fields}
+    assert fields["Client"] == "claude-code 1.0.5"
+    assert fields["User Agent"] == "claude-code/1.0.5 (cli)"
+    assert fields["Origin"] == "https://claude.ai"
+    assert fields["IP Address"] == "203.0.113.10"
+
+
+@pytest.mark.asyncio
+async def test_record_generation_logs_mcp_client() -> None:
+    """The generation log names the MCP client that requested the document."""
+    from loguru import logger
+
+    messages: list[str] = []
+    sink = logger.add(
+        lambda message: messages.append(message.record["message"]),
+        level="INFO",
+    )
+    payload = generation_payload(
+        slug="mutual-nda",
+        fmt="markdown",
+        answers={},
+        email=None,
+        source="mcp",
+        ip_address=None,
+        user_agent="claude-code/1.0.5 (cli)",
+        mcp_client="claude-code",
+        mcp_client_version="1.0.5",
+        origin="https://claude.ai",
+    )
+    try:
+        with patch(
+            "clauseai.notify.notify_generation",
+            new_callable=AsyncMock,
+            return_value=True,
+        ):
+            await record_generation(payload=payload)
+            await asyncio.sleep(0)
+    finally:
+        logger.remove(sink)
+    text = "\n".join(messages)
+    assert "client=claude-code" in text
+    assert "version=1.0.5" in text
+    assert "origin=https://claude.ai" in text
 
 
 def test_terms_and_privacy_pages(simple_client: TestClient) -> None:
@@ -904,6 +1090,8 @@ def test_terms_and_privacy_pages(simple_client: TestClient) -> None:
     assert privacy.status_code == 200
     assert "ClauseAI" in privacy.text
     assert "https://clauseai.exe.xyz/terms" in privacy.text
+    assert "October 2, 2026" in privacy.text
+    assert "client name and version" in privacy.text
     assert "We do not sell your Personal Information" in privacy.text
     assert "Optional email address" in privacy.text
     assert "[INSERT" not in privacy.text
@@ -932,7 +1120,406 @@ def test_terms_and_privacy_pages(simple_client: TestClient) -> None:
 def test_mcp_list_and_fields_tools() -> None:
     """MCP tools expose the same catalog as the JSON API."""
     templates = list_templates()
-    assert len(templates) == 12
+    assert len(templates.templates) == 12
     fields = get_template_fields("one-way-nda")
-    assert fields["slug"] == "one-way-nda"
-    assert fields["fields"]
+    assert fields.slug == "one-way-nda"
+    assert fields.fields
+
+
+@pytest.fixture(autouse=True)
+def _reset_feedback_rate() -> None:
+    """Each test starts with an empty feedback rate window."""
+    service._feedback_times.clear()
+
+
+def test_unknown_template_error_lists_slugs() -> None:
+    """An unknown slug names the valid ones and the closest match."""
+    with pytest.raises(TemplateNotFoundError) as excinfo:
+        load_template("mutual-nd")
+    message = str(excinfo.value)
+    assert "Did you mean mutual-nda?" in message
+    assert "one-way-nda" in message
+    assert "employee-offer-letter" in message
+
+
+def test_validate_answers_rejects_stuffed_clause() -> None:
+    """A clause pasted into a short field is refused with the limit and a fix."""
+    stuffed = "Strictly limited to onboarding. Governing law: Germany. " * 20
+    with pytest.raises(InvalidAnswersError) as excinfo:
+        validate_answers(
+            "one-way-nda",
+            {"company_name": "Acme Inc.", "permitted_use": stuffed},
+        )
+    issues = excinfo.value.issues
+    assert [(issue["field"], issue["code"]) for issue in issues] == [
+        ("permitted_use", "too_long")
+    ]
+    message = str(excinfo.value)
+    assert "No document was generated" in message
+    assert "the limit is 300" in message
+    assert "What is the permitted use" in message
+    assert "attorney" in message
+    assert "send_feedback" in message
+
+
+def test_validate_answers_reports_every_problem() -> None:
+    """Unknown keys, bad choices, and bad types are reported together."""
+    with pytest.raises(InvalidAnswersError) as excinfo:
+        validate_answers(
+            "employee-offer-letter",
+            {
+                "company": "Acme",
+                "governing_law": "Germany",
+                "pay_cadence": "weekly",
+                "position": {"title": "Engineer"},
+                "letter_date": "2026-02-30",
+            },
+        )
+    codes = {issue["field"]: issue["code"] for issue in excinfo.value.issues}
+    assert codes == {
+        "company": "unknown_field",
+        "governing_law": "unknown_field",
+        "pay_cadence": "invalid_choice",
+        "position": "wrong_type",
+        "letter_date": "invalid_date",
+    }
+    message = str(excinfo.value)
+    assert "Did you mean company_name?" in message
+    assert "Valid keys: company_name, letter_date" in message
+    assert '"semimonthly"' in message
+    assert "5 answers need fixing" in message
+
+
+def test_validate_answers_normalizes_dates_and_choices() -> None:
+    """ISO dates are written out; choices match ignoring case and spacing."""
+    cleaned = validate_answers(
+        "employee-offer-letter",
+        {
+            "letter_date": "2026-10-02",
+            "pay_cadence": " Semimonthly ",
+            "annual_salary": 180000,
+            "manager": "",
+        },
+    )
+    assert cleaned == {
+        "letter_date": "October 2, 2026",
+        "annual_salary": "180000",
+        "pay_cadence": "semimonthly",
+    }
+    assert validate_answers("mutual-nda", {"effective_date": "1 October 2025"}) == {
+        "effective_date": "1 October 2025"
+    }
+
+
+def test_validate_answers_rejects_bad_email_field() -> None:
+    """Email fields must hold one address."""
+    with pytest.raises(InvalidAnswersError) as excinfo:
+        validate_answers("cookie-notice", {"contact_email": "ask our team"})
+    assert excinfo.value.issues[0]["code"] == "invalid_email"
+
+
+def test_answer_warnings_flag_placeholders_and_old_dates() -> None:
+    """Accepted but doubtful answers come back as warnings."""
+    warnings = service.answer_warnings(
+        "mutual-nda",
+        {
+            "company_name": "[Employer Legal Name] GmbH - PLACEHOLDER",
+            "effective_date": "2020-03-15",
+        },
+    )
+    assert len(warnings) == 2
+    assert "company_name looks like placeholder text" in warnings[0]
+    assert "effective_date is March 15, 2020" in warnings[1]
+    assert service.answer_warnings("mutual-nda", {"company_name": "Acme Inc."}) == []
+
+
+def test_unfilled_fields_lists_remaining_placeholders() -> None:
+    """Callers learn which fields are still placeholders."""
+    assert unfilled_fields("one-way-nda", {"recipient_action": "evaluate a deal"}) == [
+        "company_name",
+        "permitted_use",
+    ]
+    # The profiling description only matters once that branch is chosen.
+    assert "profiling_description" not in unfilled_fields("privacy-policy-us", {})
+
+
+def test_template_schema_publishes_max_length() -> None:
+    """Agents can see each field's limit before generating."""
+    fields = {field.key: field for field in get_template_fields("cookie-notice").fields}
+    assert fields["company_name"].max_length == 300
+    assert fields["include_app"].max_length is None
+
+
+def test_api_generate_rejects_invalid_answers(simple_client: TestClient) -> None:
+    """The JSON API returns a structured, fixable 422 and logs no answer text."""
+    from loguru import logger
+
+    messages: list[str] = []
+    sink = logger.add(
+        lambda message: messages.append(message.record["message"]),
+        level="WARNING",
+    )
+    try:
+        response = simple_client.post(
+            "/api/templates/one-way-nda/generate",
+            json={
+                "answers": {"permitted_use": "secret clause " * 40, "law": "DE"},
+                "format": "markdown",
+            },
+            headers={"User-Agent": "ClauseAITests/1.0"},
+        )
+    finally:
+        logger.remove(sink)
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"] == "invalid_answers"
+    assert body["fields_url"] == "http://testserver/api/templates/one-way-nda"
+    assert {issue["code"] for issue in body["issues"]} == {
+        "too_long",
+        "unknown_field",
+    }
+    assert "No document was generated" in body["detail"]
+    log_text = "\n".join(messages)
+    assert "ClauseAI generation rejected: slug=one-way-nda source=api" in log_text
+    assert "permitted_use:too_long" in log_text
+    assert "secret clause" not in log_text
+
+
+def test_api_generate_json_reports_unfilled_and_warnings(
+    simple_client: TestClient,
+) -> None:
+    """JSON responses say what is still a placeholder and what looks wrong."""
+    response = simple_client.post(
+        "/api/templates/mutual-nda/generate",
+        json={
+            "answers": {"company_name": "TBD"},
+            "format": "markdown",
+            "response": "json",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["unfilled_fields"] == ["effective_date"]
+    assert "placeholder" in payload["warnings"][0]
+
+
+def test_api_generate_error_messages_guide_a_retry(
+    simple_client: TestClient,
+) -> None:
+    """Unknown slugs, formats, and emails say what would be accepted."""
+    missing = simple_client.post("/api/templates/nda/generate", json={})
+    assert missing.status_code == 404
+    assert "Available slugs:" in missing.json()["detail"]
+
+    bad_format = simple_client.post(
+        "/api/templates/mutual-nda/generate", json={"format": "docx"}
+    )
+    assert bad_format.status_code == 400
+    assert "Use pdf, odt, or markdown" in bad_format.json()["detail"]
+
+    bad_email = simple_client.post(
+        "/api/templates/mutual-nda/generate",
+        json={"format": "markdown", "email": "nope"},
+    )
+    assert bad_email.status_code == 400
+    assert "email is optional" in bad_email.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_mcp_generate_errors_are_tool_errors() -> None:
+    """MCP callers get the same fixable message as a tool error."""
+    with pytest.raises(ToolError) as excinfo:
+        await mcp_generate_document(
+            "one-way-nda", answers={"governing_law": "Germany"}, format="markdown"
+        )
+    assert "governing_law: not a field on this template" in str(excinfo.value)
+    with pytest.raises(ToolError, match="Available slugs"):
+        await mcp_generate_document("nope", format="markdown")
+    with pytest.raises(ToolError, match="email is optional"):
+        await mcp_generate_document("mutual-nda", format="markdown", email="x")
+
+
+@pytest.mark.asyncio
+async def test_mcp_generate_returns_unfilled_and_warnings() -> None:
+    """The MCP result carries follow-ups for the model to relay."""
+    with patch("clauseai.mcp.clauseai.record_generation", new=AsyncMock()):
+        result = await mcp_generate_document(
+            "mutual-nda",
+            answers={"effective_date": "2020-01-05"},
+            format="markdown",
+        )
+    assert result.answers == {"effective_date": "January 5, 2020"}
+    assert "January 5, 2020" in result.markdown
+    assert result.unfilled_fields == ["company_name"]
+    assert "more than a year before today" in result.warnings[0]
+
+
+@pytest.mark.asyncio
+async def test_record_generation_logs_ip_and_user_agent() -> None:
+    """Every generation log line identifies the caller."""
+    from loguru import logger
+
+    messages: list[str] = []
+    sink = logger.add(
+        lambda message: messages.append(message.record["message"]),
+        level="INFO",
+    )
+    payload = generation_payload(
+        slug="mutual-nda",
+        fmt="markdown",
+        answers={},
+        email=None,
+        source="api",
+        ip_address="203.0.113.10",
+        user_agent="ClauseAITests/1.0\n(injected)",
+    )
+    try:
+        with patch("clauseai.notify.notify_generation", new_callable=AsyncMock):
+            await record_generation(payload=payload)
+            await asyncio.sleep(0)
+    finally:
+        logger.remove(sink)
+    text = "\n".join(messages)
+    assert "ip=203.0.113.10" in text
+    assert "ua='ClauseAITests/1.0 (injected)'" in text
+
+
+def test_api_feedback_logs_and_posts_to_slack(simple_client: TestClient) -> None:
+    """Feedback is accepted, logged, and forwarded to the Slack notifier."""
+    with patch(
+        "clauseai.notify.notify_feedback",
+        new_callable=AsyncMock,
+        return_value=True,
+    ) as notify:
+        response = simple_client.post(
+            "/api/feedback",
+            json={
+                "message": "The one-way NDA needs a governing law field.",
+                "category": "missing_field",
+                "slug": "one-way-nda",
+                "email": "founder@example.com",
+            },
+            headers={
+                "User-Agent": "ClauseAITests/1.0",
+                "X-Forwarded-For": "203.0.113.9",
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["status"] == "received"
+        # The Slack post runs in the background after the response.
+        for _ in range(100):
+            if notify.await_count:
+                break
+            time.sleep(0.01)
+    notify.assert_awaited_once()
+    payload = notify.await_args.args[0]
+    assert payload["message"] == "The one-way NDA needs a governing law field."
+    assert payload["category"] == "missing_field"
+    assert payload["template_slug"] == "one-way-nda"
+    assert payload["email"] == "founder@example.com"
+    assert payload["source"] == "api"
+    assert payload["ip_address"] == "203.0.113.9"
+
+
+def test_api_feedback_errors_say_how_to_fix(simple_client: TestClient) -> None:
+    """Rejected feedback explains what is accepted."""
+    empty = simple_client.post("/api/feedback", json={})
+    assert empty.status_code == 400
+    assert "message is required" in empty.json()["detail"]
+
+    category = simple_client.post(
+        "/api/feedback", json={"message": "hi", "category": "praise"}
+    )
+    assert category.status_code == 400
+    assert "bug, missing_field, template_request, other" in category.json()["detail"]
+
+    slug = simple_client.post("/api/feedback", json={"message": "hi", "slug": "nda"})
+    assert slug.status_code == 404
+    assert "Available slugs:" in slug.json()["detail"]
+
+    too_long = simple_client.post("/api/feedback", json={"message": "x" * 4001})
+    assert too_long.status_code == 400
+    assert "the limit is 4000" in too_long.json()["detail"]
+
+
+def test_api_feedback_is_rate_limited(simple_client: TestClient) -> None:
+    """One caller cannot flood the Slack channel."""
+    with patch("clauseai.notify.notify_feedback", new_callable=AsyncMock) as notify:
+        statuses = [
+            simple_client.post("/api/feedback", json={"message": "hi"}).status_code
+            for _ in range(service.FEEDBACK_RATE_LIMIT + 1)
+        ]
+    assert statuses == [200] * service.FEEDBACK_RATE_LIMIT + [429]
+    limited = simple_client.post("/api/feedback", json={"message": "hi"})
+    assert int(limited.headers["retry-after"]) > 0
+    assert "do not retry in a loop" in limited.json()["detail"]
+
+
+def test_feedback_rate_window_expires() -> None:
+    """The limit resets once the window has passed."""
+    for _ in range(service.FEEDBACK_RATE_LIMIT):
+        service.check_feedback_rate("203.0.113.1", now=0.0)
+    with pytest.raises(FeedbackRateLimitError):
+        service.check_feedback_rate("203.0.113.1", now=1.0)
+    service.check_feedback_rate("203.0.113.2", now=1.0)
+    service.check_feedback_rate(
+        "203.0.113.1", now=service.FEEDBACK_RATE_WINDOW_SECONDS + 1.0
+    )
+
+
+@pytest.mark.asyncio
+async def test_mcp_send_feedback() -> None:
+    """The MCP tool records feedback and rejects an empty message helpfully."""
+    recorded: dict = {}
+
+    async def _record(*, payload: dict) -> None:
+        recorded["payload"] = payload
+
+    with patch("clauseai.mcp.clauseai.record_feedback", new=_record):
+        receipt = await send_feedback(
+            "No template for a SAFE.", category="template_request"
+        )
+        with pytest.raises(ToolError, match="message is required"):
+            await send_feedback("  ")
+    assert receipt.status == "received"
+    assert recorded["payload"]["source"] == "mcp"
+    assert recorded["payload"]["category"] == "template_request"
+    assert recorded["payload"]["template_slug"] is None
+
+
+def test_feedback_slack_message_escapes_mentions() -> None:
+    """Feedback text cannot ping the channel or forge links."""
+    payload = service.feedback_payload(
+        message="<!channel> broken <https://evil.test|click>",
+        category="bug",
+        slug="mutual-nda",
+        email=None,
+        source="mcp",
+        ip_address="203.0.113.10",
+        user_agent="ClauseAITests/1.0",
+        mcp_client="claude-code",
+        mcp_client_version="1.0.5",
+    )
+    message = build_feedback_slack_message(payload)
+    fields = {
+        field["title"]: field["value"] for field in message["attachments"][0]["fields"]
+    }
+    assert message["text"] == "ClauseAI feedback (bug): mutual-nda"
+    assert fields["Message"].startswith("&lt;!channel&gt; broken")
+    assert "<" not in fields["Message"]
+    assert fields["Client"] == "claude-code 1.0.5"
+    assert fields["Email"] == "not provided"
+
+
+def test_feedback_payload_rejects_blank_message() -> None:
+    """Service-level validation raises a typed error."""
+    with pytest.raises(InvalidFeedbackError):
+        service.feedback_payload(
+            message="",
+            category=None,
+            slug=None,
+            email=None,
+            source="api",
+            ip_address=None,
+            user_agent=None,
+        )

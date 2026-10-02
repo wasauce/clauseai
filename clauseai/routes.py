@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -12,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, EmailStr, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from clauseai.config import (
     GITHUB_REPO,
@@ -22,20 +23,38 @@ from clauseai.config import (
     SKILL_INSTALL_COMMAND,
     get_base_url,
 )
+from clauseai.downloads import (
+    DownloadSigningUnavailable,
+    DownloadTokenError,
+    read_download_token,
+)
 from clauseai.log import get_logger
 from clauseai.service import (
+    FEEDBACK_CATEGORIES,
+    FEEDBACK_RECEIVED,
     OMIT_ANSWER,
+    FeedbackRateLimitError,
+    InvalidAnswersError,
+    InvalidEmailError,
+    InvalidFeedbackError,
     InvalidFormatError,
     RenderUnavailableError,
     TemplateNotFoundError,
-    answered_fields,
+    answer_warnings,
+    check_feedback_rate,
+    feedback_payload,
     generate_document,
     generation_payload,
     load_template,
+    log_rejected_generation,
+    normalize_email,
     normalize_format,
+    record_feedback,
     record_generation,
     summarize_templates,
     template_schema,
+    unfilled_fields,
+    validate_answers,
 )
 
 logger = get_logger(__name__)
@@ -54,6 +73,25 @@ class GenerateBody(BaseModel):
     format: str = "pdf"
     email: Optional[str] = None
     response: str = "file"
+
+
+class FeedbackBody(BaseModel):
+    """JSON body for feedback from an agent or a person."""
+
+    message: str = Field(
+        default="",
+        description="What you were trying to do and what was wrong or missing.",
+    )
+    category: str = Field(
+        default="other",
+        description=f"One of: {', '.join(FEEDBACK_CATEGORIES)}.",
+    )
+    slug: Optional[str] = Field(
+        default=None, description="Template slug the feedback is about, if any."
+    )
+    email: Optional[str] = Field(
+        default=None, description="Optional address for a reply."
+    )
 
 
 def _page_context(request: Request, **kwargs: Any) -> dict[str, Any]:
@@ -90,20 +128,10 @@ def _client_ip(request: Request) -> Optional[str]:
 
 
 def _normalize_email(raw: Optional[str]) -> Optional[str]:
-    if raw is None:
-        return None
-    value = raw.strip()
-    if not value:
-        return None
     try:
-
-        class EmailModel(BaseModel):
-            email: EmailStr
-
-        EmailModel(email=value)
-    except ValidationError:
-        raise HTTPException(status_code=400, detail="Invalid email address") from None
-    return value
+        return normalize_email(raw)
+    except InvalidEmailError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _answers_from_form(form: dict[str, Any], slug: str) -> dict[str, Any]:
@@ -115,7 +143,11 @@ def _answers_from_form(form: dict[str, Any], slug: str) -> dict[str, Any]:
                 return parsed
         except json.JSONDecodeError:
             raise HTTPException(
-                status_code=400, detail="answers must be valid JSON"
+                status_code=400,
+                detail=(
+                    "answers must be a JSON object mapping field keys to "
+                    'values, for example {"company_name": "Acme Inc."}'
+                ),
             ) from None
 
     loaded = load_template(slug)
@@ -144,8 +176,25 @@ async def _run_generation(
 
     try:
         normalized = normalize_format(fmt)
-        cleaned = answered_fields(slug, answers)
+        cleaned = validate_answers(slug, answers)
+        email_value = _normalize_email(email)
         rendered = await generate_document(slug, cleaned, normalized)
+    except InvalidAnswersError as exc:
+        log_rejected_generation(
+            exc,
+            source=source,
+            ip_address=_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
+        )
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": str(exc),
+                "error": "invalid_answers",
+                "issues": exc.issues,
+                "fields_url": f"{get_base_url()}/api/templates/{slug}",
+            },
+        )
     except InvalidFormatError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RenderUnavailableError as exc:
@@ -153,7 +202,6 @@ async def _run_generation(
     except TemplateNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    email_value = _normalize_email(email)
     payload = generation_payload(
         slug=loaded.manifest.slug,
         fmt=normalized,
@@ -174,6 +222,9 @@ async def _run_generation(
                 "filename": rendered.filename,
                 "media_type": rendered.media_type,
                 "content_base64": base64.b64encode(rendered.content).decode("ascii"),
+                "answers": cleaned,
+                "unfilled_fields": unfilled_fields(slug, cleaned),
+                "warnings": answer_warnings(slug, answers),
             }
         )
 
@@ -223,6 +274,7 @@ def build_llms_txt(base_url: Optional[str] = None) -> str:
             f"- [Interactive docs]({root}/docs): FastAPI Swagger UI",
             f"- [OpenAPI]({root}/openapi.json): Machine-readable API schema",
             f"- [Template catalog (JSON)]({root}/api/templates): Slugs, titles, and descriptions",
+            f"- [Feedback]({root}/api/feedback): POST JSON with a message to report a missing field, missing template, or bug",
             "",
             "## Templates",
             "",
@@ -232,7 +284,11 @@ def build_llms_txt(base_url: Optional[str] = None) -> str:
             "## Legal",
             "",
             f"- [Terms of Use]({root}/terms): Terms for using ClauseAI",
-            f"- [Privacy Policy]({root}/privacy): How ClauseAI handles personal information",
+            (
+                f"- [Privacy Policy]({root}/privacy): "
+                "How ClauseAI handles personal information"
+            ),
+            f"- [Support]({root}/support): How to contact ClauseAI",
             "",
             "## Optional",
             "",
@@ -326,6 +382,18 @@ async def clauseai_skill() -> Response:
 
 
 @well_known_router.get(
+    "/.well-known/openai-apps-challenge",
+    include_in_schema=False,
+)
+async def openai_apps_challenge() -> Response:
+    """Serve the OpenAI plugin domain-verification token as plain text."""
+    token = os.getenv("OPENAI_APPS_CHALLENGE", "").strip()
+    if not token:
+        raise HTTPException(status_code=404, detail="Not found")
+    return Response(content=token, media_type="text/plain")
+
+
+@well_known_router.get(
     "/.well-known/skills/clauseai/skill.md",
     include_in_schema=False,
 )
@@ -377,6 +445,39 @@ async def api_generate_template(
     )
 
 
+@router.post("/api/feedback", summary="Send feedback about ClauseAI")
+async def api_feedback(request: Request, body: FeedbackBody) -> JSONResponse:
+    """Record feedback from an agent or a person and notify the operator.
+
+    Use it when a template lacks a field, no template fits, or a result
+    was wrong. Do not include document text or personal details.
+    """
+    ip_address = _client_ip(request)
+    try:
+        payload = feedback_payload(
+            message=body.message,
+            category=body.category,
+            slug=body.slug,
+            email=body.email,
+            source="api",
+            ip_address=ip_address,
+            user_agent=request.headers.get("user-agent"),
+        )
+        check_feedback_rate(ip_address)
+    except FeedbackRateLimitError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail=str(exc),
+            headers={"Retry-After": str(exc.retry_after)},
+        ) from exc
+    except TemplateNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (InvalidFeedbackError, InvalidEmailError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await record_feedback(payload=payload)
+    return JSONResponse({"status": "received", "detail": FEEDBACK_RECEIVED})
+
+
 _RESERVED_SLUGS = {
     "api",
     "mcp",
@@ -390,7 +491,25 @@ _RESERVED_SLUGS = {
     "openapi.json",
     "terms",
     "privacy",
+    "support",
 }
+
+
+_SUPPORT_BODY = """
+<h1>Support</h1>
+<p>
+    Email
+    <a href="mailto:wferrell@gmail.com">wferrell@gmail.com</a>
+    with questions about the ClauseAI website, API, MCP server, or
+    ChatGPT and Codex plugin.
+</p>
+<p>No account is required.</p>
+<p>
+    Templates are for general reference and are not legal advice.
+    See the <a href="/terms">Terms of Use</a> and
+    <a href="/privacy">Privacy Policy</a>.
+</p>
+"""
 
 
 @router.get("/terms", response_class=HTMLResponse, summary="Terms of Use")
@@ -401,6 +520,59 @@ async def terms_page(request: Request) -> HTMLResponse:
         page="terms",
         title="Terms of Use | ClauseAI",
         description="Terms of Use for the ClauseAI website, API, and MCP server.",
+    )
+
+
+@router.get("/support", response_class=HTMLResponse, summary="Support")
+async def support_page(request: Request) -> HTMLResponse:
+    """Serve the ClauseAI contact page."""
+    return templates.TemplateResponse(
+        request,
+        "legal.html",
+        _page_context(
+            request,
+            title="Support | ClauseAI",
+            description=(
+                "Contact ClauseAI about the website, API, MCP server, or plugin."
+            ),
+            body=_SUPPORT_BODY,
+            show_template_notice=False,
+        ),
+    )
+
+
+@router.get("/api/downloads", summary="Download a signed ClauseAI document")
+async def api_download_document(token: str) -> Response:
+    """Re-render a document from a stateless signed token."""
+    try:
+        slug, fmt, answers = read_download_token(token)
+    except DownloadSigningUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except DownloadTokenError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{exc}. Download links cannot be edited or rebuilt by hand. "
+                "Generate the document again to get a new link."
+            ),
+        ) from exc
+
+    try:
+        rendered = await generate_document(slug, answers, fmt)
+    except InvalidFormatError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RenderUnavailableError as exc:
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except TemplateNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return Response(
+        content=rendered.content,
+        media_type=rendered.media_type,
+        headers={
+            "Cache-Control": "private, no-store",
+            "Content-Disposition": (f'attachment; filename="{rendered.filename}"'),
+        },
     )
 
 

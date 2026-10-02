@@ -47,6 +47,7 @@ Open [http://localhost:8000](http://localhost:8000).
 | Wizard | `GET /{slug}` |
 | JSON API | `GET /api/templates` |
 | Generate | `POST /api/templates/{slug}/generate` |
+| Feedback | `POST /api/feedback` (logged, and posted to Slack when `SLACK_WEBHOOK_URL` is set) |
 | Agent skill | `GET /skill.md` |
 | MCP | `/mcp` |
 | Agent index | `GET /llms.txt` |

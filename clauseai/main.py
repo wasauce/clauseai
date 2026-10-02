@@ -65,19 +65,30 @@ class AccessLogMiddleware:
             path = scope.get("path") or "/"
             method = scope.get("method") or "-"
             ip_address = _client_ip(scope) or "-"
+            user_agent = _header(scope, b"user-agent") or "-"
+            user_agent = user_agent.replace("\r", " ").replace("\n", " ")
             _access_logger.info(
-                f"{ip_address} | {method} {path} | {status_code} | {elapsed_ms}ms"
+                f"{ip_address} | {method} {path} | {status_code} | "
+                f"{elapsed_ms}ms | {user_agent}"
             )
+
+
+def _header(scope, name: bytes) -> str | None:
+    """Return one request header value from an ASGI scope."""
+    for key, value in scope.get("headers") or []:
+        if key.lower() != name:
+            continue
+        decoded = value.decode("latin-1").strip()
+        if decoded:
+            return decoded
+    return None
 
 
 def _client_ip(scope) -> str | None:
     """Return the first forwarded client address, else the socket peer."""
-    for name, value in scope.get("headers") or []:
-        if name.lower() != b"x-forwarded-for":
-            continue
-        forwarded = value.decode("latin-1").split(",")[0].strip()
-        if forwarded:
-            return forwarded
+    forwarded = _header(scope, b"x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
     client = scope.get("client")
     if client:
         return client[0]
