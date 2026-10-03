@@ -549,6 +549,19 @@ def test_msa_honors_governing_state() -> None:
     assert "New York State" in filled
 
 
+def test_msa_platform_description_is_a_field() -> None:
+    """The upstream client's product description is a blank, not fixed text."""
+    unanswered = fill_template("master-services-agreement", {})
+    assert "generative AI applications" not in unanswered
+    assert "platform designed to [what the platform does]." in unanswered
+
+    filled = fill_template(
+        "master-services-agreement",
+        {"platform_description": "manage customer support tickets"},
+    )
+    assert "platform designed to manage customer support tickets." in filled
+
+
 def test_employee_offer_letter_reuses_employee_name() -> None:
     """One employee_name answer fills the address block and signature."""
     filled = fill_template(
