@@ -1421,8 +1421,6 @@ async def test_mcp_generate_errors_are_tool_errors() -> None:
     assert "governing_law: not a field on this template" in str(excinfo.value)
     with pytest.raises(ToolError, match="Available slugs"):
         await mcp_generate_document("nope", format="markdown")
-    with pytest.raises(ToolError, match="email is optional"):
-        await mcp_generate_document("mutual-nda", format="markdown", email="x")
 
 
 @pytest.mark.asyncio

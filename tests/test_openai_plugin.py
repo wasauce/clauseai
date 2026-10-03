@@ -326,10 +326,17 @@ async def test_mcp_tool_annotations_and_instructions() -> None:
     assert generate.read_only_hint is False
     assert generate.destructive_hint is False
     assert generate.open_world_hint is False
+    # The directory scan flags inputs a document does not need.
+    assert set(tools["generate_document"].parameters["properties"]) == {
+        "slug",
+        "answers",
+        "format",
+    }
     feedback = tools["send_feedback"]
     assert feedback.annotations is not None
     assert feedback.annotations.read_only_hint is False
     assert feedback.annotations.destructive_hint is False
+    assert feedback.annotations.open_world_hint is True
     assert feedback.description.startswith("Use this")
     schema = tools["generate_document"].output_schema
     assert schema is not None

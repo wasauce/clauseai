@@ -27,8 +27,6 @@ Ask only for fields you genuinely cannot determine. Do it in one short message t
 
 Choice fields may include `__omit__`. Send that value to remove a placeholder. An empty string leaves the placeholder; it does not omit it.
 
-Include `email` only when the user gives you one. Do not ask for an email.
-
 ## Answers
 
 Answers are short values, not clauses. `get_template_fields` gives each field's `max_length`.

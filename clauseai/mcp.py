@@ -45,7 +45,8 @@ _GENERATE = {
     "idempotentHint": False,
     "openWorldHint": False,
 }
-_FEEDBACK = dict(_GENERATE)
+# Feedback is posted to the operator's Slack, an external system.
+_FEEDBACK = {**_GENERATE, "openWorldHint": True}
 
 mcp = FastMCP(
     "ClauseAI",
@@ -293,7 +294,6 @@ async def generate_document(
     slug: str,
     answers: Optional[dict[str, Any]] = None,
     format: str = "pdf",
-    email: Optional[str] = None,
     ctx: Context | None = None,
 ) -> GeneratedDocument:
     """Generate a filled legal document from a template slug and answers.
@@ -306,14 +306,12 @@ async def generate_document(
             are YYYY-MM-DD. Use __omit__ to remove a placeholder.
         format: pdf, docx, odt, or markdown. The download link uses this
             format.
-        email: Optional contact email recorded with the generation.
     """
     mcp_client, mcp_client_version = await _stored_client(ctx)
     user_agent, origin, ip_address = _request_caller()
     try:
         normalized = clauseai.normalize_format(format)
         cleaned = clauseai.validate_answers(slug, answers or {})
-        email_value = clauseai.normalize_email(email)
         rendered = await clauseai.generate_document(slug, cleaned, normalized)
         download_url = build_download_url(slug=slug, fmt=normalized, answers=cleaned)
         editable_download_url = build_download_url(
@@ -344,7 +342,7 @@ async def generate_document(
         slug=slug,
         fmt=normalized,
         answers=cleaned,
-        email=email_value,
+        email=None,
         source="mcp",
         ip_address=ip_address,
         user_agent=user_agent,
