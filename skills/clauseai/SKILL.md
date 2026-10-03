@@ -1,6 +1,6 @@
 ---
 name: clauseai
-description: "Generate startup legal documents from attorney-drafted templates: NDAs, MSAs, DPAs, privacy policies, offer letters, and more. Download PDF, ODT, or Markdown through MCP or an agent skill. No account required."
+description: "Generate startup legal documents from attorney-drafted templates: NDAs, MSAs, DPAs, privacy policies, offer letters, and more. Download PDF, Word, ODT, or Markdown through MCP or an agent skill. No account required."
 ---
 
 # ClauseAI
@@ -32,7 +32,8 @@ immediately.
 }
 ```
 
-`format` is `pdf`, `odt`, or `markdown`. `response` of `json`
+`format` is `pdf`, `docx`, `odt`, or `markdown`. Use `docx`
+when the user wants a Word copy to edit. `response` of `json`
 returns base64 content; omit it or use `file` for a download.
 Email is optional. If the user gives one, include it.
 Choice fields may include `__omit__`. Send that value to

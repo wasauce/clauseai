@@ -26,7 +26,8 @@ SERVER_INSTRUCTIONS = (
     "Answers are short values, not clauses. "
     "Every field is optional. Omit what you do not know; "
     "missing answers stay as placeholders. "
-    "One generate call returns the text and a download link. "
+    "One generate call returns the text, a download link, and a Word "
+    "link for editing; give the user both. "
     "Tell the user about warnings and unfilled_fields. "
     "Use send_feedback for a missing field or template. "
     "These documents are templates, not legal advice."
@@ -203,7 +204,14 @@ class GeneratedDocument(BaseModel):
     )
     download_url: str = Field(
         description=(
-            "Absolute URL that downloads the rendered PDF, ODT, or Markdown file."
+            "Absolute URL that downloads the rendered PDF, Word, ODT, or "
+            "Markdown file."
+        )
+    )
+    editable_download_url: str = Field(
+        description=(
+            "Absolute URL for a Word (.docx) copy the user can edit before "
+            "signing. Give it to the user with download_url."
         )
     )
     answers: dict[str, str] = Field(
@@ -273,7 +281,8 @@ def get_template_fields(slug: str) -> TemplateFields:
         "Use this after reading the field schema, to fill published fields "
         "and return markdown plus a download link. Do not invent clause text. "
         "Call it once per document: the result always includes the markdown "
-        "text, and download_url is the file in the requested format. Answers "
+        "text, download_url is the file in the requested format, and "
+        "editable_download_url is a Word copy the user can edit. Answers "
         "are short values for the published fields; unknown keys, overlong "
         "values, and choices outside a field's options are rejected with "
         "instructions for fixing them."
@@ -295,7 +304,8 @@ async def generate_document(
             get_template_fields. Leave out keys you cannot answer; they
             stay as placeholders. Do not send placeholder text. Dates
             are YYYY-MM-DD. Use __omit__ to remove a placeholder.
-        format: pdf, odt, or markdown. The download link uses this format.
+        format: pdf, docx, odt, or markdown. The download link uses this
+            format.
         email: Optional contact email recorded with the generation.
     """
     mcp_client, mcp_client_version = await _stored_client(ctx)
@@ -306,6 +316,9 @@ async def generate_document(
         email_value = clauseai.normalize_email(email)
         rendered = await clauseai.generate_document(slug, cleaned, normalized)
         download_url = build_download_url(slug=slug, fmt=normalized, answers=cleaned)
+        editable_download_url = build_download_url(
+            slug=slug, fmt="docx", answers=cleaned
+        )
     except clauseai.InvalidAnswersError as exc:
         clauseai.log_rejected_generation(
             exc,
@@ -351,6 +364,7 @@ async def generate_document(
         filename=rendered.filename,
         markdown=rendered.filled_markdown,
         download_url=download_url,
+        editable_download_url=editable_download_url,
         answers=cleaned,
         unfilled_fields=clauseai.unfilled_fields(slug, cleaned),
         warnings=clauseai.answer_warnings(slug, answers),

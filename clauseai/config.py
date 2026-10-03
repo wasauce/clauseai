@@ -11,12 +11,12 @@ SKILL_INSTALL_COMMAND = "npx skills add wasauce/clauseai --skill clauseai"
 LISTING_DESCRIPTION = (
     "Generate startup legal documents from attorney-drafted templates: "
     "NDAs, MSAs, DPAs, privacy policies, offer letters, and more. "
-    "Download PDF, ODT, or Markdown through MCP or an agent skill. "
+    "Download PDF, Word, ODT, or Markdown through MCP or an agent skill. "
     "No account required."
 )
 MCP_REGISTRY_DESCRIPTION = (
     "Generate attorney-drafted NDAs, MSAs, DPAs, and more as "
-    "PDF, ODT, or Markdown. No account required."
+    "PDF, Word, or Markdown. No account required."
 )
 
 

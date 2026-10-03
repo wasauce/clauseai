@@ -35,6 +35,7 @@ from clauseai.service import (
     TemplateField,
     TemplateNotFoundError,
     answered_fields,
+    build_filename,
     fill_template,
     generate_document,
     generation_payload,
@@ -664,11 +665,13 @@ def test_answered_fields_keeps_omit_sentinel() -> None:
 
 
 def test_normalize_format_aliases() -> None:
-    """Accept md aliases and reject unknown formats."""
+    """Accept md and Word aliases and reject unknown formats."""
     assert normalize_format("MD") == "markdown"
     assert normalize_format("pdf") == "pdf"
+    assert normalize_format("Word") == "docx"
+    assert build_filename("mutual-nda", "word") == "mutual-nda.docx"
     with pytest.raises(InvalidFormatError):
-        normalize_format("docx")
+        normalize_format("rtf")
 
 
 def test_pandoc_available_in_ci() -> None:
@@ -683,7 +686,7 @@ def test_pandoc_available_in_ci() -> None:
 
 @pytest.mark.asyncio
 async def test_render_all_formats() -> None:
-    """Render the mutual NDA as markdown, PDF, and ODT."""
+    """Render the mutual NDA as markdown, PDF, Word, and ODT."""
     markdown = fill_template("mutual-nda", {"company_name": "Acme Inc."})
 
     md_bytes = await render_document(markdown, "markdown")
@@ -700,6 +703,9 @@ async def test_render_all_formats() -> None:
 
     odt_bytes = await render_document(markdown, "odt")
     assert odt_bytes.startswith(b"PK")
+
+    docx_bytes = await render_document(markdown, "docx")
+    assert docx_bytes.startswith(b"PK")
 
 
 @pytest.mark.asyncio
@@ -1392,10 +1398,10 @@ def test_api_generate_error_messages_guide_a_retry(
     assert "Available slugs:" in missing.json()["detail"]
 
     bad_format = simple_client.post(
-        "/api/templates/mutual-nda/generate", json={"format": "docx"}
+        "/api/templates/mutual-nda/generate", json={"format": "rtf"}
     )
     assert bad_format.status_code == 400
-    assert "Use pdf, odt, or markdown" in bad_format.json()["detail"]
+    assert "Use pdf, docx, odt, or markdown" in bad_format.json()["detail"]
 
     bad_email = simple_client.post(
         "/api/templates/mutual-nda/generate",

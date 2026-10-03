@@ -4,7 +4,7 @@ Effective as of October 2, 2026.
 
 **California Notice at Collection / State Privacy Rights Notice:** See the State privacy rights notice section below for information about your rights under applicable state privacy laws.
 
-ClauseAI ("**ClauseAI**," "**we**," "**us**," or "**our**") provides a service that generates startup legal documents from attorney-drafted templates. You can download PDF, ODT, or Markdown through the website, a JSON API, an MCP server, or an agent skill. No account is required. This Privacy Policy describes how ClauseAI processes personal information that we collect through our digital or online properties or services that link to this Privacy Policy (collectively, the "**Service**").
+ClauseAI ("**ClauseAI**," "**we**," "**us**," or "**our**") provides a service that generates startup legal documents from attorney-drafted templates. You can download PDF, Word, ODT, or Markdown through the website, a JSON API, an MCP server, or an agent skill. No account is required. This Privacy Policy describes how ClauseAI processes personal information that we collect through our digital or online properties or services that link to this Privacy Policy (collectively, the "**Service**").
 
 Your use of the Service is also subject to our [Terms of Use](https://clauseai.exe.xyz/terms).
 

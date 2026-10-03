@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "clauseai",
   "version": "1.0.0",
-  "description": "Fill attorney-drafted startup legal templates and download PDF, ODT, or Markdown. No account required.",
+  "description": "Fill attorney-drafted startup legal templates and download PDF, Word, ODT, or Markdown. No account required.",
   "author": {
     "name": "ClauseAI",
     "email": "wferrell@gmail.com",
@@ -16,13 +16,13 @@
       "interface": {
         "displayName": "ClauseAI",
         "shortDescription": "Draft startup legal documents",
-        "longDescription": "ClauseAI fills attorney-drafted General Legal templates and returns a downloadable PDF, ODT, or Markdown file. It covers NDAs, MSAs, DPAs, privacy policies, terms of use, cookie notices, offer letters, advisor agreements, and business associate agreements.\n\nAsk for the document you need. ClauseAI uses details you have already provided, asks once for anything still missing, and generates the file without an account.\n\nOnly the published fields in each template can be filled. ClauseAI does not rewrite clauses, draft custom contracts, give legal advice, negotiate terms, or send documents to other people. The templates are for general reference and are not legal advice.",
+        "longDescription": "ClauseAI fills attorney-drafted General Legal templates and returns a downloadable PDF, Word, ODT, or Markdown file. It covers NDAs, MSAs, DPAs, privacy policies, terms of use, cookie notices, offer letters, advisor agreements, and business associate agreements.\n\nAsk for the document you need. ClauseAI uses details you have already provided, asks once for anything still missing, and generates the file without an account.\n\nOnly the published fields in each template can be filled. ClauseAI does not rewrite clauses, draft custom contracts, give legal advice, negotiate terms, or send documents to other people. The templates are for general reference and are not legal advice.",
         "developerName": "ClauseAI",
         "category": "Business & Operations",
         "capabilities": [
           "Draft NDAs, MSAs, and DPAs",
           "Draft privacy policies and terms",
-          "Download PDF, ODT, or Markdown"
+          "Download PDF, Word, ODT, or Markdown"
         ],
         "websiteURL": "https://clauseai.exe.xyz",
         "supportURL": "https://clauseai.exe.xyz/support",

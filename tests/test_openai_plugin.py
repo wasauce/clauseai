@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import struct
 import tomllib
 from pathlib import Path
@@ -116,6 +117,7 @@ def test_draft_skill_declares_mcp_dependency() -> None:
     assert "get_template_fields" in skill
     assert "generate_document" in skill
     assert "download_url" in skill
+    assert "editable_download_url" in skill
     assert "__omit__" in skill
     assert "not legal advice" in skill
 
@@ -213,6 +215,32 @@ async def test_mcp_generate_returns_markdown_and_download_url(
     assert "no-store" in downloaded.headers["cache-control"]
 
 
+@pytest.mark.asyncio
+async def test_mcp_generate_returns_editable_word_link(
+    simple_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every result carries a Word link so the user can edit the document."""
+    if shutil.which("pandoc") is None:
+        pytest.skip("pandoc binary not installed")
+    monkeypatch.setenv("BASE_URL", "https://clauseai.exe.xyz")
+    result = await generate_document(
+        "mutual-nda",
+        answers={"company_name": "Acme Inc."},
+        format="markdown",
+    )
+    assert result.editable_download_url != result.download_url
+
+    token = result.editable_download_url.split("token=", 1)[1]
+    downloaded = simple_client.get("/api/downloads", params={"token": token})
+    assert downloaded.status_code == 200
+    assert downloaded.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    assert "mutual-nda.docx" in downloaded.headers["content-disposition"]
+    assert downloaded.content.startswith(b"PK")
+
+
 def test_download_route_does_not_record_another_generation(
     simple_client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
@@ -305,5 +333,6 @@ async def test_mcp_tool_annotations_and_instructions() -> None:
     schema = tools["generate_document"].output_schema
     assert schema is not None
     assert "download_url" in schema["properties"]
+    assert "editable_download_url" in schema["properties"]
     assert "markdown" in schema["properties"]
     assert "content_base64" not in schema["properties"]

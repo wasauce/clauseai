@@ -17,7 +17,7 @@ Use the ClauseAI MCP server, in this order:
 2. Call `get_template_fields` for that slug.
 3. Call `generate_document` with the answers you have.
 
-`format` is `pdf`, `odt`, or `markdown`. Use `pdf` unless the user asks for another format. The tool returns filled markdown for your summary and a `download_url` for the file. Give the user that link.
+`format` is `pdf`, `docx`, `odt`, or `markdown`. Use `pdf` unless the user asks for another format; use `docx` when they ask for Word. The tool returns filled markdown for your summary, a `download_url` for the file, and an `editable_download_url` for a Word copy. Give the user both links.
 
 ## Fill fields before asking
 
@@ -44,7 +44,7 @@ When a template lacks a field the user needs, or no template fits, call `send_fe
 
 ## Result
 
-Tell the user which template you used, which fields you filled, and give them `download_url`. Tell them which fields in `unfilled_fields` are still placeholders, and pass on anything in `warnings`. Summarize the document. Paste the full text only when they ask to see it.
+Tell the user which template you used, which fields you filled, and give them `download_url`. Also give them `editable_download_url`, a Word copy they can edit to fill the remaining placeholders before signing. Tell them which fields in `unfilled_fields` are still placeholders, and pass on anything in `warnings`. Summarize the document. Paste the full text only when they ask to see it.
 
 ## Decline
 

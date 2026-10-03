@@ -34,11 +34,14 @@ logger = get_logger(__name__)
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "data" / "templates"
 MARK_RE = re.compile(r"<mark>(.*?)</mark>", re.DOTALL)
-SUPPORTED_FORMATS = ("pdf", "odt", "markdown")
-FormatName = Literal["pdf", "odt", "markdown"]
+SUPPORTED_FORMATS = ("pdf", "docx", "odt", "markdown")
+FormatName = Literal["pdf", "docx", "odt", "markdown"]
 
 MEDIA_TYPES = {
     "pdf": "application/pdf",
+    "docx": (
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ),
     "odt": "application/vnd.oasis.opendocument.text",
     "markdown": "text/markdown; charset=utf-8",
 }
@@ -418,9 +421,11 @@ def normalize_format(fmt: str | None) -> FormatName:
     value = (fmt or "pdf").strip().lower()
     if value in {"md", "markdown", "text"}:
         return "markdown"
+    if value == "word":
+        return "docx"
     if value not in SUPPORTED_FORMATS:
         raise InvalidFormatError(
-            f"Unsupported format: {_quote(fmt)}. Use pdf, odt, or markdown."
+            f"Unsupported format: {_quote(fmt)}. Use pdf, docx, odt, or markdown."
         )
     return value  # type: ignore[return-value]
 
@@ -432,7 +437,7 @@ async def render_document(markdown: str, fmt: str) -> bytes:
         return markdown.encode("utf-8")
     if normalized == "pdf":
         return await _render_pdf(markdown)
-    return _render_odt(markdown)
+    return _render_pandoc(markdown, normalized)
 
 
 async def _render_pdf(markdown: str) -> bytes:
@@ -441,37 +446,39 @@ async def _render_pdf(markdown: str) -> bytes:
     return await markdown_to_pdf(markdown)
 
 
-def _render_odt(markdown: str) -> bytes:
+def _render_pandoc(markdown: str, fmt: str) -> bytes:
+    """Render Word or ODT with pandoc."""
+    label = "Word" if fmt == "docx" else "ODT"
     if shutil.which("pandoc") is None:
         raise RenderUnavailableError(
-            "ODT export is unavailable on this server (pandoc is not "
+            f"{label} export is unavailable on this server (pandoc is not "
             "installed). Retrying will not help; use format pdf or markdown."
         )
     try:
         import pypandoc
     except ImportError as exc:
         raise RenderUnavailableError(
-            "ODT export is unavailable on this server (pypandoc is not "
+            f"{label} export is unavailable on this server (pypandoc is not "
             "installed). Retrying will not help; use format pdf or markdown."
         ) from exc
 
-    handle = tempfile.NamedTemporaryFile(suffix=".odt", delete=False)
+    handle = tempfile.NamedTemporaryFile(suffix=f".{fmt}", delete=False)
     output_path = handle.name
     handle.close()
     try:
         # Templates use --- rules that pandoc otherwise reads as YAML.
         pypandoc.convert_text(
             markdown,
-            "odt",
+            fmt,
             format="markdown-yaml_metadata_block",
             outputfile=output_path,
         )
         with open(output_path, "rb") as handle:
             return handle.read()
     except Exception as exc:
-        logger.exception("ODT conversion failed")
+        logger.exception("%s conversion failed", label)
         raise RenderUnavailableError(
-            f"ODT conversion failed: {exc}. Use format pdf or markdown instead."
+            f"{label} conversion failed: {exc}. Use format pdf or markdown instead."
         ) from exc
     finally:
         try:

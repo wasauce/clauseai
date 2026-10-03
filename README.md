@@ -1,6 +1,6 @@
 # ClauseAI
 
-Generate startup legal documents from attorney-drafted templates: NDAs, MSAs, DPAs, privacy policies, offer letters, and more. Download PDF, ODT, or Markdown through MCP or an agent skill. No account required.
+Generate startup legal documents from attorney-drafted templates: NDAs, MSAs, DPAs, privacy policies, offer letters, and more. Download PDF, Word, ODT, or Markdown through MCP or an agent skill. No account required.
 
 The gallery, JSON API, MCP server, and agent skill all share the same template engine. Templates come from [General Legal](https://general.legal) and are released under CC0.
 
@@ -30,7 +30,7 @@ System dependencies:
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/)
-- `pandoc` for ODT export (`brew install pandoc` or `apt-get install pandoc`)
+- `pandoc` for Word and ODT export (`brew install pandoc` or `apt-get install pandoc`)
 - WeasyPrint libraries for PDF (`brew install pango gdk-pixbuf libffi` on macOS)
 
 ```bash
