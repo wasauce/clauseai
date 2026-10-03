@@ -1,6 +1,6 @@
 [project]
 name = "clauseai"
-version = "0.1.0"
+version = "1.0.0"
 description = "Fill attorney-drafted General Legal templates and download PDF, ODT, or Markdown."
 readme = "README.md"
 requires-python = ">=3.12"

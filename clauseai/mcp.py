@@ -10,6 +10,7 @@ from fastmcp.server.dependencies import get_http_request
 from fastmcp.server.middleware import Middleware
 from pydantic import BaseModel, Field
 
+from clauseai import __version__
 from clauseai import service as clauseai
 from clauseai.config import PRODUCTION_BASE_URL
 from clauseai.downloads import DownloadSigningUnavailable, build_download_url
@@ -48,7 +49,7 @@ _FEEDBACK = dict(_GENERATE)
 mcp = FastMCP(
     "ClauseAI",
     instructions=SERVER_INSTRUCTIONS,
-    version="0.1.0",
+    version=__version__,
     website_url=PRODUCTION_BASE_URL,
 )
 

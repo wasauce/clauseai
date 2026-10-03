@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import struct
+import tomllib
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from clauseai import __version__
 from clauseai.downloads import (
     DownloadSigningUnavailable,
     DownloadTokenError,
@@ -86,6 +88,18 @@ def test_plugin_package_meets_listing_limits() -> None:
         width, height = _png_size(PLUGIN / "assets" / name)
         assert width == height
         assert width >= 48
+
+
+def test_versions_match() -> None:
+    """The plugin, MCP registry entry, package, and MCP server share one version."""
+    manifest = json.loads((PLUGIN / "plugin.json").read_text(encoding="utf-8"))
+    server = json.loads((ROOT / "server.json").read_text(encoding="utf-8"))
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert manifest["version"] == __version__
+    assert server["version"] == __version__
+    assert pyproject["project"]["version"] == __version__
+    assert mcp.version == __version__
 
 
 def test_draft_skill_declares_mcp_dependency() -> None:

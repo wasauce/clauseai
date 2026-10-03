@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from fastmcp.exceptions import ToolError
 
-from clauseai import service
+from clauseai import __version__, service
 from clauseai.mcp import (
     generate_document as mcp_generate_document,
     get_template_fields,
@@ -800,7 +800,7 @@ def test_mcp_initialize_without_trailing_slash(simple_client: TestClient) -> Non
     )
     assert response.status_code == 200
     assert "ClauseAI" in response.text
-    assert "0.1.0" in response.text
+    assert __version__ in response.text
 
 
 def test_mcp_generate_records_declared_client(simple_client: TestClient) -> None:
