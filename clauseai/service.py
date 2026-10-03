@@ -321,24 +321,43 @@ def fill_template(slug: str, answers: dict[str, Any] | None) -> str:
     """Replace answered marks; leave unanswered marks as placeholder text.
 
     Unanswered choice marks become ``[<label>]`` so alternative legal
-    branches are never published together.
+    branches are never published together. Editorial brackets around a
+    replaced mark, as in ``[<mark>Delaware</mark>]``, are dropped.
     """
     loaded = load_template(slug)
+    markdown = loaded.markdown
     values = _answers_by_mark(loaded.manifest, answers or {})
     choice_placeholders = _choice_placeholders_by_mark(loaded.manifest)
     parts: list[str] = []
     cursor = 0
-    for index, match in enumerate(MARK_RE.finditer(loaded.markdown)):
-        parts.append(loaded.markdown[cursor : match.start()])
+    for index, match in enumerate(MARK_RE.finditer(markdown)):
+        start, end = match.start(), match.end()
         if index in values:
-            parts.append(values[index])
+            replacement = values[index]
         elif index in choice_placeholders:
-            parts.append(choice_placeholders[index])
+            replacement = choice_placeholders[index]
         else:
+            parts.append(markdown[cursor:start])
             parts.append(match.group(1))
-        cursor = match.end()
-    parts.append(loaded.markdown[cursor:])
+            cursor = end
+            continue
+        if _is_bracketed(markdown, start, end):
+            start, end = start - 1, end + 1
+        parts.append(markdown[cursor:start])
+        parts.append(replacement)
+        cursor = end
+    parts.append(markdown[cursor:])
     return "".join(parts)
+
+
+def _is_bracketed(markdown: str, start: int, end: int) -> bool:
+    """True when a mark sits inside ``[...]`` that is not Markdown link text."""
+    return (
+        start > 0
+        and markdown[start - 1] == "["
+        and markdown[end : end + 1] == "]"
+        and markdown[end + 1 : end + 2] != "("
+    )
 
 
 def _choice_placeholders_by_mark(manifest: TemplateManifest) -> dict[int, str]:

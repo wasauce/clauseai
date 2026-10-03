@@ -9,6 +9,18 @@
     {
       "find": "- [Company]",
       "replace": "- <mark>[Company]</mark>"
+    },
+    {
+      "find": ", a Delaware corporation (",
+      "replace": ", <mark>a Delaware corporation</mark> ("
+    },
+    {
+      "find": "laws of the State of Delaware, without",
+      "replace": "laws of the State of <mark>Delaware</mark>, without"
+    },
+    {
+      "find": "- Name of Other Signatory (Please Print)",
+      "replace": "- <mark>Name of Other Signatory (Please Print)</mark>"
     }
   ],
   "fields": [
@@ -18,7 +30,16 @@
       "question": "What is your company's name?",
       "type": "text",
       "required": false,
-      "marks": [0, 2]
+      "marks": [0, 4]
+    },
+    {
+      "key": "company_entity",
+      "label": "Company entity",
+      "question": "What kind of entity is your company, starting with a or an (for example, a Delaware corporation or an Ohio limited liability company)?",
+      "type": "text",
+      "required": false,
+      "max_length": 100,
+      "marks": [1]
     },
     {
       "key": "effective_date",
@@ -26,7 +47,24 @@
       "question": "What is the effective date of the NDA?",
       "type": "date",
       "required": false,
-      "marks": [1]
+      "marks": [2]
+    },
+    {
+      "key": "governing_state",
+      "label": "Governing law state",
+      "question": "Which state's law governs the NDA?",
+      "type": "text",
+      "required": false,
+      "max_length": 60,
+      "marks": [3]
+    },
+    {
+      "key": "other_party_name",
+      "label": "Other party name",
+      "question": "What is the other party's name?",
+      "type": "text",
+      "required": false,
+      "marks": [5]
     }
   ]
 }

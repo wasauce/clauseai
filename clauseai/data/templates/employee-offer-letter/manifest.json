@@ -21,7 +21,7 @@
     },
     {
       "find": "[<mark>the Company's office at [location]/your home office (remote)] in </mark>[<mark>city, California</mark>]",
-      "replace": "[<mark>the Company's office at [location]/your home office (remote)</mark>] in [<mark>city</mark>, California]"
+      "replace": "[<mark>the Company's office at [location]/your home office (remote)</mark>] in [<mark>city</mark>], California"
     },
     {
       "find": "$[<mark>annual salary], subject to applicable</mark>",

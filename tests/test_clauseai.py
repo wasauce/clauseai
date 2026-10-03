@@ -81,6 +81,23 @@ def test_fill_template_replaces_answers_and_strips_marks() -> None:
     assert "2026" in filled
 
 
+@pytest.mark.parametrize("slug", list_template_slugs())
+def test_fill_template_drops_brackets_around_answers(slug: str) -> None:
+    """An answer never prints as ``[value]``, and an omitted one leaves no ``[]``."""
+    manifest = load_template(slug).manifest
+    empty_brackets = fill_template(slug, {}).count("[]")
+    for field in manifest.fields:
+        if not field.marks:
+            continue
+        values = field.options if field.type == "choice" else ["Sample Value"]
+        for value in values:
+            filled = fill_template(slug, {field.key: value})
+            if value == OMIT_ANSWER:
+                assert filled.count("[]") == empty_brackets, field.key
+            else:
+                assert f"[{value}]" not in filled, field.key
+
+
 def test_fill_template_escapes_html_in_answers() -> None:
     """HTML in answers must not reach md2pdf/WeasyPrint as raw tags."""
     payload = '<img src="http://169.254.169.254/latest/meta-data/">'
@@ -112,6 +129,43 @@ def test_one_way_nda_fills_signature_company_name() -> None:
     assert filled.count("Acme Inc.") == 2
     assert "[Company Name]" not in filled
     assert "<mark>" not in filled
+
+
+def test_mutual_nda_fills_other_party_entity_and_governing_law() -> None:
+    """The counterparty, entity description, and governing state are fillable."""
+    filled = fill_template(
+        "mutual-nda",
+        {
+            "company_name": "Acme Inc.",
+            "company_entity": "an Ohio limited liability company",
+            "governing_state": "California",
+            "other_party_name": "Northwind Labs",
+        },
+    )
+    assert "Acme Inc., an Ohio limited liability company (" in filled
+    assert "laws of the State of California, without" in filled
+    assert "**OTHER SIGNATORY**\n- Northwind Labs\n" in filled
+    assert "Delaware" not in filled
+    assert "Name of Other Signatory" not in filled
+
+
+def test_mutual_nda_defaults_keep_template_text() -> None:
+    """Unanswered new fields print the template's original wording."""
+    filled = fill_template("mutual-nda", {"company_name": "Acme Inc."})
+    assert "Acme Inc., a Delaware corporation (" in filled
+    assert "laws of the State of Delaware, without" in filled
+    assert "- Name of Other Signatory (Please Print)" in filled
+
+
+def test_one_way_nda_fills_recipient_and_governing_law() -> None:
+    """The recipient's name and governing state are fillable."""
+    filled = fill_template(
+        "one-way-nda",
+        {"governing_state": "New York", "recipient_name": "Jordan Lee"},
+    )
+    assert "laws of the State of New York, without" in filled
+    assert "**RECIPIENT**\n- Jordan Lee\n" in filled
+    assert "Delaware" not in filled
 
 
 def test_one_way_nda_permitted_use_omits_editorial_brackets() -> None:
@@ -482,7 +536,7 @@ def test_msa_honors_governing_state() -> None:
         "master-services-agreement",
         {"governing_state": "California"},
     )
-    assert "laws of the State of [California]" in filled
+    assert "laws of the State of California, without" in filled
     assert (
         "substantive rights and obligations of the parties shall be governed by the internal laws of the State of New York"
         not in filled
@@ -554,15 +608,15 @@ def test_employee_offer_letter_keeps_fixed_prose_outside_marks() -> None:
     )
     assert "<mark>" not in filled
     assert (
-        "Your regular work location will be [the Company&#x27;s office] in "
-        "[San Francisco, California]."
+        "Your regular work location will be the Company&#x27;s office in "
+        "San Francisco, California."
     ) in filled
     assert (
-        "Your annual base salary will be $[100,000], subject to applicable "
+        "Your annual base salary will be $100,000, subject to applicable "
         "payroll deductions"
     ) in filled
     assert "$$" not in filled
-    assert "on a [every two weeks] basis." in filled
+    assert "on a every two weeks basis." in filled
 
 
 def test_fill_template_unknown_slug() -> None:
@@ -717,7 +771,13 @@ def test_skill_and_api_endpoints(simple_client: TestClient) -> None:
     schema = simple_client.get("/api/templates/mutual-nda")
     assert schema.status_code == 200
     keys = {field["key"] for field in schema.json()["fields"]}
-    assert keys == {"company_name", "effective_date"}
+    assert keys == {
+        "company_name",
+        "company_entity",
+        "effective_date",
+        "governing_state",
+        "other_party_name",
+    }
 
 
 def test_gallery_and_wizard_are_indexable(simple_client: TestClient) -> None:
@@ -1238,6 +1298,8 @@ def test_unfilled_fields_lists_remaining_placeholders() -> None:
     assert unfilled_fields("one-way-nda", {"recipient_action": "evaluate a deal"}) == [
         "company_name",
         "permitted_use",
+        "governing_state",
+        "recipient_name",
     ]
     # The profiling description only matters once that branch is chosen.
     assert "profiling_description" not in unfilled_fields("privacy-policy-us", {})
@@ -1299,7 +1361,12 @@ def test_api_generate_json_reports_unfilled_and_warnings(
     )
     assert response.status_code == 200
     payload = response.json()
-    assert payload["unfilled_fields"] == ["effective_date"]
+    assert payload["unfilled_fields"] == [
+        "company_entity",
+        "effective_date",
+        "governing_state",
+        "other_party_name",
+    ]
     assert "placeholder" in payload["warnings"][0]
 
 
@@ -1350,7 +1417,12 @@ async def test_mcp_generate_returns_unfilled_and_warnings() -> None:
         )
     assert result.answers == {"effective_date": "January 5, 2020"}
     assert "January 5, 2020" in result.markdown
-    assert result.unfilled_fields == ["company_name"]
+    assert result.unfilled_fields == [
+        "company_name",
+        "company_entity",
+        "governing_state",
+        "other_party_name",
+    ]
     assert "more than a year before today" in result.warnings[0]
 
 

@@ -13,6 +13,14 @@
     {
       "find": "solely to [<mark>enable Recipient</mark> to <mark>evaluate or pursue a business relationship with the Company</mark>]",
       "replace": "solely to <mark>enable Recipient</mark> to <mark>evaluate or pursue a business relationship with the Company</mark>"
+    },
+    {
+      "find": "laws of the State of Delaware, without",
+      "replace": "laws of the State of <mark>Delaware</mark>, without"
+    },
+    {
+      "find": "- Recipient Name (print)",
+      "replace": "- <mark>Recipient Name (print)</mark>"
     }
   ],
   "fields": [
@@ -22,7 +30,7 @@
       "question": "What is the disclosing company's name?",
       "type": "text",
       "required": false,
-      "marks": [0, 3]
+      "marks": [0, 4]
     },
     {
       "key": "recipient_action",
@@ -39,6 +47,23 @@
       "type": "text",
       "required": false,
       "marks": [2]
+    },
+    {
+      "key": "governing_state",
+      "label": "Governing law state",
+      "question": "Which state's law governs the NDA?",
+      "type": "text",
+      "required": false,
+      "max_length": 60,
+      "marks": [3]
+    },
+    {
+      "key": "recipient_name",
+      "label": "Recipient name",
+      "question": "What is the recipient's name?",
+      "type": "text",
+      "required": false,
+      "marks": [5]
     }
   ]
 }

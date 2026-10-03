@@ -26,7 +26,8 @@ https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R
 
 1. Call `list_templates` and pick `mutual-nda`.
 2. Call `get_template_fields` with slug `mutual-nda`. The fill-in fields are
-   `company_name` and `effective_date`.
+   `company_name`, `company_entity`, `effective_date`, `governing_state`, and
+   `other_party_name`.
 3. Call `generate_document` with:
 
 ```json
@@ -34,7 +35,8 @@ https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R
   "slug": "mutual-nda",
   "answers": {
     "company_name": "Acme Inc.",
-    "effective_date": "2026-09-11"
+    "effective_date": "2026-09-11",
+    "other_party_name": "Northwind Labs"
   },
   "format": "markdown"
 }
@@ -48,7 +50,8 @@ curl -sS https://clauseai.exe.xyz/api/templates/mutual-nda/generate \
   -d '{
     "answers": {
       "company_name": "Acme Inc.",
-      "effective_date": "2026-09-11"
+      "effective_date": "2026-09-11",
+      "other_party_name": "Northwind Labs"
     },
     "format": "markdown",
     "response": "json"
