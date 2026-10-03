@@ -68,6 +68,7 @@ def test_plugin_package_meets_listing_limits() -> None:
 
     review = manifest["extensions"]["com.openai"]["review"]
     assert review["commerce"] is False
+    assert review["demo_recording_url"].startswith("https://")
     assert len(review["test_cases"]["positive"]) == 5
     assert len(review["test_cases"]["negative"]) == 3
     for case in review["test_cases"]["positive"]:
