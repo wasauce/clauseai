@@ -31,24 +31,26 @@ from clauseai.downloads import (
 from clauseai.log import get_logger
 from clauseai.service import (
     FEEDBACK_CATEGORIES,
-    FEEDBACK_RECEIVED,
     OMIT_ANSWER,
     FeedbackRateLimitError,
     InvalidAnswersError,
     InvalidEmailError,
     InvalidFeedbackError,
     InvalidFormatError,
+    InvalidPhoneError,
     RenderUnavailableError,
     TemplateNotFoundError,
     answer_warnings,
     check_feedback_rate,
     feedback_payload,
+    feedback_receipt_detail,
     generate_document,
     generation_payload,
     load_template,
     log_rejected_generation,
     normalize_email,
     normalize_format,
+    normalize_phone,
     record_feedback,
     record_generation,
     summarize_templates,
@@ -71,7 +73,20 @@ class GenerateBody(BaseModel):
 
     answers: dict[str, Any] = Field(default_factory=dict)
     format: str = "pdf"
-    email: Optional[str] = None
+    email: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional email address of the person the document is for, so "
+            "the ClauseAI team can follow up. Only send one they gave you."
+        ),
+    )
+    phone: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional phone number of the person the document is for, so "
+            "the ClauseAI team can follow up. Only send one they gave you."
+        ),
+    )
     response: str = "file"
 
 
@@ -90,7 +105,16 @@ class FeedbackBody(BaseModel):
         default=None, description="Template slug the feedback is about, if any."
     )
     email: Optional[str] = Field(
-        default=None, description="Optional address for a reply."
+        default=None,
+        description=(
+            "Optional email address for a reply. Only send one the user gave you."
+        ),
+    )
+    phone: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional phone number for a reply. Only send one the user gave you."
+        ),
     )
 
 
@@ -134,6 +158,13 @@ def _normalize_email(raw: Optional[str]) -> Optional[str]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+def _normalize_phone(raw: Optional[str]) -> Optional[str]:
+    try:
+        return normalize_phone(raw)
+    except InvalidPhoneError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 def _answers_from_form(form: dict[str, Any], slug: str) -> dict[str, Any]:
     raw = form.get("answers")
     if isinstance(raw, str) and raw.strip():
@@ -166,6 +197,7 @@ async def _run_generation(
     answers: dict[str, Any],
     fmt: str,
     email: Optional[str],
+    phone: Optional[str],
     source: str,
     response_mode: str,
 ) -> Response:
@@ -178,6 +210,7 @@ async def _run_generation(
         normalized = normalize_format(fmt)
         cleaned = validate_answers(slug, answers)
         email_value = _normalize_email(email)
+        phone_value = _normalize_phone(phone)
         rendered = await generate_document(slug, cleaned, normalized)
     except InvalidAnswersError as exc:
         log_rejected_generation(
@@ -207,6 +240,7 @@ async def _run_generation(
         fmt=normalized,
         answers=cleaned,
         email=email_value,
+        phone=phone_value,
         source=source,
         ip_address=_client_ip(request),
         user_agent=request.headers.get("user-agent"),
@@ -274,7 +308,7 @@ def build_llms_txt(base_url: Optional[str] = None) -> str:
             f"- [Interactive docs]({root}/docs): FastAPI Swagger UI",
             f"- [OpenAPI]({root}/openapi.json): Machine-readable API schema",
             f"- [Template catalog (JSON)]({root}/api/templates): Slugs, titles, and descriptions",
-            f"- [Feedback]({root}/api/feedback): POST JSON with a message to report a missing field, missing template, or bug",
+            f"- [Feedback]({root}/api/feedback): POST JSON with a message to report a missing field, missing template, or bug; add an email or phone if the user wants a reply",
             "",
             "## Templates",
             "",
@@ -440,6 +474,7 @@ async def api_generate_template(
         answers=body.answers,
         fmt=body.format,
         email=body.email,
+        phone=body.phone,
         source="api",
         response_mode=body.response,
     )
@@ -450,7 +485,8 @@ async def api_feedback(request: Request, body: FeedbackBody) -> JSONResponse:
     """Record feedback from an agent or a person and notify the operator.
 
     Use it when a template lacks a field, no template fits, or a result
-    was wrong. Do not include document text or personal details.
+    was wrong. Do not include document text or personal details other
+    than an optional email or phone number for a reply.
     """
     ip_address = _client_ip(request)
     try:
@@ -459,6 +495,7 @@ async def api_feedback(request: Request, body: FeedbackBody) -> JSONResponse:
             category=body.category,
             slug=body.slug,
             email=body.email,
+            phone=body.phone,
             source="api",
             ip_address=ip_address,
             user_agent=request.headers.get("user-agent"),
@@ -472,10 +509,12 @@ async def api_feedback(request: Request, body: FeedbackBody) -> JSONResponse:
         ) from exc
     except TemplateNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except (InvalidFeedbackError, InvalidEmailError) as exc:
+    except (InvalidFeedbackError, InvalidEmailError, InvalidPhoneError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     await record_feedback(payload=payload)
-    return JSONResponse({"status": "received", "detail": FEEDBACK_RECEIVED})
+    return JSONResponse(
+        {"status": "received", "detail": feedback_receipt_detail(payload)}
+    )
 
 
 _RESERVED_SLUGS = {
@@ -630,6 +669,7 @@ async def clauseai_generate(slug: str, request: Request) -> Response:
         answers = body.answers
         fmt = body.format
         email = body.email
+        phone = body.phone
         response_mode = body.response
         source = "web"
     else:
@@ -641,6 +681,7 @@ async def clauseai_generate(slug: str, request: Request) -> Response:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         fmt = form_data.get("format") or "pdf"
         email = form_data.get("email")
+        phone = form_data.get("phone")
         response_mode = form_data.get("response") or "file"
         source = "web"
 
@@ -650,6 +691,7 @@ async def clauseai_generate(slug: str, request: Request) -> Response:
         answers=answers,
         fmt=fmt,
         email=email,
+        phone=phone,
         source=source,
         response_mode=response_mode,
     )

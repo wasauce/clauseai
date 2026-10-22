@@ -28,6 +28,7 @@ immediately.
   "answers": {"company_name": "Acme Inc."},
   "format": "pdf",
   "email": "optional@example.com",
+  "phone": "+1 415 555 0123",
   "response": "json"
 }
 ```
@@ -35,7 +36,10 @@ immediately.
 `format` is `pdf`, `docx`, `odt`, or `markdown`. Use `docx`
 when the user wants a Word copy to edit. `response` of `json`
 returns base64 content; omit it or use `file` for a download.
-Email is optional. If the user gives one, include it.
+`email` and `phone` are optional. They let the ClauseAI team
+follow up with the person you are acting for. Include one only
+when the user gives it to you for that purpose. Do not ask for
+either, and do not invent one.
 Choice fields may include `__omit__`. Send that value to
 remove a placeholder. Empty strings are unanswered, not omit.
 
@@ -74,8 +78,10 @@ the user asks for a different file.
 
 Send feedback when a template lacks a field, no template fits,
 or a result was wrong. `category` is `bug`, `missing_field`,
-`template_request`, or `other`. `slug` and `email` are optional.
-Do not include document text or personal details.
+`template_request`, or `other`. `slug`, `email`, and `phone` are
+optional. Include `email` or `phone` only when the user wants a
+reply and gave it to you. Do not include document text or other
+personal details.
 
 ## Workflow
 

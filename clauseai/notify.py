@@ -19,9 +19,10 @@ def build_slack_message(payload: dict[str, Any]) -> dict[str, Any]:
         "template_slug", "ClauseAI document"
     )
     email = payload.get("email")
+    phone = payload.get("phone")
     title_text = f"ClauseAI document generated: {title}"
-    if email:
-        title_text = f"{title_text} ({email})"
+    if email or phone:
+        title_text = f"{title_text} ({email or phone})"
 
     fields: list[dict[str, Any]] = [
         {"title": "Template", "value": str(title), "short": True},
@@ -52,6 +53,13 @@ def build_slack_message(payload: dict[str, Any]) -> dict[str, Any]:
         fields.append({"title": "Email", "value": str(email), "short": False})
     else:
         fields.append({"title": "Email", "value": "not provided", "short": False})
+    fields.append(
+        {
+            "title": "Phone",
+            "value": str(phone) if phone else "not provided",
+            "short": False,
+        }
+    )
 
     answers = payload.get("answers") or {}
     if isinstance(answers, dict) and answers:
@@ -106,6 +114,7 @@ def build_feedback_slack_message(payload: dict[str, Any]) -> dict[str, Any]:
     category = str(payload.get("category") or "other")
     slug = payload.get("template_slug")
     email = payload.get("email")
+    phone = payload.get("phone")
     title_text = f"ClauseAI feedback ({category})"
     if slug:
         title_text = f"{title_text}: {slug}"
@@ -126,6 +135,11 @@ def build_feedback_slack_message(payload: dict[str, Any]) -> dict[str, Any]:
         {
             "title": "Email",
             "value": _slack_escape(str(email)) if email else "not provided",
+            "short": True,
+        },
+        {
+            "title": "Phone",
+            "value": _slack_escape(str(phone)) if phone else "not provided",
             "short": True,
         },
     ]

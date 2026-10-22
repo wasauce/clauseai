@@ -294,6 +294,8 @@ async def generate_document(
     slug: str,
     answers: Optional[dict[str, Any]] = None,
     format: str = "pdf",
+    email: Optional[str] = None,
+    phone: Optional[str] = None,
     ctx: Context | None = None,
 ) -> GeneratedDocument:
     """Generate a filled legal document from a template slug and answers.
@@ -306,12 +308,20 @@ async def generate_document(
             are YYYY-MM-DD. Use __omit__ to remove a placeholder.
         format: pdf, docx, odt, or markdown. The download link uses this
             format.
+        email: Optional email address of the person you are acting for,
+            so the ClauseAI team can follow up. Only pass one the user
+            gave you for this purpose. Do not ask for it.
+        phone: Optional phone number of the person you are acting for,
+            so the ClauseAI team can follow up. Only pass one the user
+            gave you for this purpose. Do not ask for it.
     """
     mcp_client, mcp_client_version = await _stored_client(ctx)
     user_agent, origin, ip_address = _request_caller()
     try:
         normalized = clauseai.normalize_format(format)
         cleaned = clauseai.validate_answers(slug, answers or {})
+        email_value = clauseai.normalize_email(email)
+        phone_value = clauseai.normalize_phone(phone)
         rendered = await clauseai.generate_document(slug, cleaned, normalized)
         download_url = build_download_url(slug=slug, fmt=normalized, answers=cleaned)
         editable_download_url = build_download_url(
@@ -342,7 +352,8 @@ async def generate_document(
         slug=slug,
         fmt=normalized,
         answers=cleaned,
-        email=None,
+        email=email_value,
+        phone=phone_value,
         source="mcp",
         ip_address=ip_address,
         user_agent=user_agent,
@@ -375,7 +386,8 @@ async def generate_document(
         "Use this when a template lacks a field or clause the user needs, "
         "no template fits the request, a tool result was wrong, or the user "
         "wants to tell the ClauseAI team something. The message goes to the "
-        "ClauseAI operator. Do not include document text or personal details."
+        "ClauseAI operator. Do not include document text or personal details, "
+        "except an email or phone number the user offers for a reply."
     ),
     annotations=_FEEDBACK,
 )
@@ -384,6 +396,7 @@ async def send_feedback(
     category: str = "other",
     slug: Optional[str] = None,
     email: Optional[str] = None,
+    phone: Optional[str] = None,
     ctx: Context | None = None,
 ) -> FeedbackReceipt:
     """Send feedback about ClauseAI to its operator.
@@ -393,7 +406,10 @@ async def send_feedback(
             Up to 4000 characters.
         category: bug, missing_field, template_request, or other.
         slug: Template slug the feedback is about, if any.
-        email: Optional address for a reply. Only pass one the user gave you.
+        email: Optional email address for a reply. Only pass one the user
+            gave you.
+        phone: Optional phone number for a reply. Only pass one the user
+            gave you.
     """
     mcp_client, mcp_client_version = await _stored_client(ctx)
     user_agent, origin, ip_address = _request_caller()
@@ -403,6 +419,7 @@ async def send_feedback(
             category=category,
             slug=slug,
             email=email,
+            phone=phone,
             source="mcp",
             ip_address=ip_address,
             user_agent=user_agent,
@@ -414,7 +431,9 @@ async def send_feedback(
     except clauseai.ClauseAIError as exc:
         raise ToolError(str(exc)) from exc
     await clauseai.record_feedback(payload=payload)
-    return FeedbackReceipt(status="received", detail=clauseai.FEEDBACK_RECEIVED)
+    return FeedbackReceipt(
+        status="received", detail=clauseai.feedback_receipt_detail(payload)
+    )
 
 
 def get_clauseai_mcp_http_app():

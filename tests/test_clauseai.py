@@ -32,6 +32,7 @@ from clauseai.service import (
     InvalidAnswersError,
     InvalidFeedbackError,
     InvalidFormatError,
+    InvalidPhoneError,
     TemplateField,
     TemplateNotFoundError,
     answered_fields,
@@ -771,6 +772,7 @@ def test_skill_and_api_endpoints(simple_client: TestClient) -> None:
     assert "http://testserver/api/templates" in skill.text
     assert "Fill in as many answers as you can yourself" in skill.text
     assert "__omit__" in skill.text
+    assert '"phone": "+1 415 555 0123"' in skill.text
     assert "https://x.ai/bot/lBf5ZVjFUDPgn_OVzU8_R" in skill.text
     assert "https://clauseai.exe.xyz" not in skill.text
     assert 'description: "Generate startup legal documents' in skill.text
@@ -1169,10 +1171,11 @@ def test_terms_and_privacy_pages(simple_client: TestClient) -> None:
     assert privacy.status_code == 200
     assert "ClauseAI" in privacy.text
     assert "https://clauseai.exe.xyz/terms" in privacy.text
-    assert "October 2, 2026" in privacy.text
+    assert "October 22, 2026" in privacy.text
     assert "client name and version" in privacy.text
     assert "We do not sell your Personal Information" in privacy.text
-    assert "Optional email address" in privacy.text
+    assert "Optional email address or phone number" in privacy.text
+    assert "without providing an email address or phone number" in privacy.text
     assert "[INSERT" not in privacy.text
     assert "Cookie Policy / Privacy Policy -- hyperlink" not in privacy.text
     assert "Templates are attorney-drafted" not in privacy.text
@@ -1598,6 +1601,7 @@ def test_feedback_slack_message_escapes_mentions() -> None:
     assert "<" not in fields["Message"]
     assert fields["Client"] == "claude-code 1.0.5"
     assert fields["Email"] == "not provided"
+    assert fields["Phone"] == "not provided"
 
 
 def test_feedback_payload_rejects_blank_message() -> None:
@@ -1612,3 +1616,323 @@ def test_feedback_payload_rejects_blank_message() -> None:
             ip_address=None,
             user_agent=None,
         )
+
+
+def _wait_for_notify(notify: AsyncMock) -> None:
+    """Slack posts run in the background after the response is sent."""
+    for _ in range(100):
+        if notify.await_count:
+            return
+        time.sleep(0.01)
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("+1 415 555 0123", "+1 415 555 0123"),
+        ("(415) 555-0123", "(415) 555-0123"),
+        ("  415.555.0123   ext. 42 ", "415.555.0123 ext. 42"),
+        ("+44 20 7946 0958", "+44 20 7946 0958"),
+        ("", None),
+        ("   ", None),
+        (None, None),
+    ],
+)
+def test_normalize_phone_accepts_common_formats(
+    raw: str | None, expected: str | None
+) -> None:
+    """Phone numbers keep their punctuation; blanks mean not provided."""
+    assert service.normalize_phone(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "call me",
+        "12345",
+        "+1 415 555 0123 and ask for Sam",
+        "1" * 16,
+        "+1 (415) 555-0123 ext. 1234567",
+        "+1 415 555 0123 - - - - - - - - -",
+    ],
+)
+def test_normalize_phone_rejects_non_numbers(raw: str) -> None:
+    """Text, too few or too many digits, and overlong values are refused."""
+    with pytest.raises(InvalidPhoneError) as excinfo:
+        service.normalize_phone(raw)
+    message = str(excinfo.value)
+    assert "phone is optional" in message
+    assert "Do not invent a number" in message
+
+
+def test_api_generate_records_contact_details(simple_client: TestClient) -> None:
+    """Email and phone given with a generate request reach the notifier."""
+    with patch(
+        "clauseai.notify.notify_generation",
+        new_callable=AsyncMock,
+        return_value=True,
+    ) as notify:
+        response = simple_client.post(
+            "/api/templates/mutual-nda/generate",
+            json={
+                "answers": {"company_name": "Acme Inc."},
+                "format": "markdown",
+                "email": "founder@example.com",
+                "phone": " +1 415 555 0123 ",
+            },
+        )
+        assert response.status_code == 200
+        _wait_for_notify(notify)
+    notify.assert_awaited_once()
+    payload = notify.await_args.args[0]
+    assert payload["email"] == "founder@example.com"
+    assert payload["phone"] == "+1 415 555 0123"
+    assert payload["source"] == "api"
+
+    openapi = simple_client.get("/openapi.json").json()["components"]["schemas"]
+    assert "phone" in openapi["GenerateBody"]["properties"]
+    assert "phone" in openapi["FeedbackBody"]["properties"]
+
+
+def test_api_generate_rejects_bad_phone(simple_client: TestClient) -> None:
+    """A phone that is not a number is refused with guidance."""
+    with patch("clauseai.notify.notify_generation", new_callable=AsyncMock) as notify:
+        response = simple_client.post(
+            "/api/templates/mutual-nda/generate",
+            json={"format": "markdown", "phone": "call me"},
+        )
+        assert response.status_code == 400
+        assert "phone is optional" in response.json()["detail"]
+        assert "+1 415 555 0123" in response.json()["detail"]
+    notify.assert_not_awaited()
+
+
+def test_wizard_form_accepts_phone(simple_client: TestClient) -> None:
+    """The wizard offers an optional phone field and records it."""
+    wizard = simple_client.get("/mutual-nda")
+    assert wizard.status_code == 200
+    assert "Email (optional)" in wizard.text
+    assert "Phone (optional)" in wizard.text
+    assert 'name="phone"' in wizard.text
+    assert 'type="tel"' in wizard.text
+
+    with patch(
+        "clauseai.notify.notify_generation",
+        new_callable=AsyncMock,
+        return_value=True,
+    ) as notify:
+        response = simple_client.post(
+            "/mutual-nda/generate",
+            data={"format": "markdown", "email": "", "phone": "(415) 555-0123"},
+        )
+        assert response.status_code == 200
+        assert "attachment" in response.headers["content-disposition"]
+        _wait_for_notify(notify)
+    payload = notify.await_args.args[0]
+    assert payload["phone"] == "(415) 555-0123"
+    assert payload["email"] is None
+    assert payload["source"] == "web"
+
+
+def test_slack_payload_includes_phone() -> None:
+    """Generation notifications show the phone, or say it was not provided."""
+    with_phone = generation_payload(
+        slug="mutual-nda",
+        fmt="pdf",
+        answers={},
+        email=None,
+        phone="+1 415 555 0123",
+        source="web",
+        ip_address=None,
+        user_agent=None,
+    )
+    message = build_slack_message(with_phone)
+    fields = {
+        field["title"]: field["value"] for field in message["attachments"][0]["fields"]
+    }
+    assert "+1 415 555 0123" in message["text"]
+    assert fields["Phone"] == "+1 415 555 0123"
+    assert fields["Email"] == "not provided"
+
+    without = generation_payload(
+        slug="mutual-nda",
+        fmt="pdf",
+        answers={},
+        email=None,
+        source="web",
+        ip_address=None,
+        user_agent=None,
+    )
+    assert without["phone"] is None
+    message = build_slack_message(without)
+    fields = {
+        field["title"]: field["value"] for field in message["attachments"][0]["fields"]
+    }
+    assert fields["Phone"] == "not provided"
+    assert "(" not in message["text"]
+
+
+def test_api_feedback_records_contact_and_promises_follow_up(
+    simple_client: TestClient,
+) -> None:
+    """Contact details reach the notifier and change the receipt text."""
+    with patch(
+        "clauseai.notify.notify_feedback",
+        new_callable=AsyncMock,
+        return_value=True,
+    ) as notify:
+        response = simple_client.post(
+            "/api/feedback",
+            json={
+                "message": "Please add a SAFE template.",
+                "category": "template_request",
+                "phone": " +1 (415) 555-0123 ",
+            },
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "received"
+        assert body["detail"] == service.FEEDBACK_RECEIVED_WITH_CONTACT
+        assert "may follow up" in body["detail"]
+        _wait_for_notify(notify)
+    payload = notify.await_args.args[0]
+    assert payload["phone"] == "+1 (415) 555-0123"
+    assert payload["email"] is None
+
+    with patch("clauseai.notify.notify_feedback", new_callable=AsyncMock):
+        plain = simple_client.post("/api/feedback", json={"message": "hi"})
+    assert plain.status_code == 200
+    assert plain.json()["detail"] == service.FEEDBACK_RECEIVED
+    assert "may follow up" not in plain.json()["detail"]
+
+
+def test_api_feedback_rejects_bad_contact_details(
+    simple_client: TestClient,
+) -> None:
+    """Bad email or phone values are refused before the rate limit counts."""
+    with patch("clauseai.notify.notify_feedback", new_callable=AsyncMock) as notify:
+        bad_phone = simple_client.post(
+            "/api/feedback", json={"message": "hi", "phone": "call me"}
+        )
+        assert bad_phone.status_code == 400
+        assert "phone is optional" in bad_phone.json()["detail"]
+
+        bad_email = simple_client.post(
+            "/api/feedback", json={"message": "hi", "email": "nope"}
+        )
+        assert bad_email.status_code == 400
+        assert "email is optional" in bad_email.json()["detail"]
+    notify.assert_not_awaited()
+    assert not service._feedback_times
+
+
+@pytest.mark.asyncio
+async def test_mcp_send_feedback_with_contact_details() -> None:
+    """The MCP feedback tool passes email and phone through to the record."""
+    recorded: dict = {}
+
+    async def _record(*, payload: dict) -> None:
+        recorded["payload"] = payload
+
+    with patch("clauseai.mcp.clauseai.record_feedback", new=_record):
+        receipt = await send_feedback(
+            "The MSA needs a notice address field.",
+            category="missing_field",
+            slug="master-services-agreement",
+            email="founder@example.com",
+            phone="+1 415 555 0123",
+        )
+        with pytest.raises(ToolError, match="phone is optional"):
+            await send_feedback("hi", phone="call me")
+    assert receipt.status == "received"
+    assert receipt.detail == service.FEEDBACK_RECEIVED_WITH_CONTACT
+    assert recorded["payload"]["email"] == "founder@example.com"
+    assert recorded["payload"]["phone"] == "+1 415 555 0123"
+    assert recorded["payload"]["template_slug"] == "master-services-agreement"
+
+
+@pytest.mark.asyncio
+async def test_mcp_generate_records_contact_details() -> None:
+    """An agent can pass the user's email or phone with a generation."""
+    record = AsyncMock()
+    with patch("clauseai.mcp.clauseai.record_generation", new=record):
+        result = await mcp_generate_document(
+            "mutual-nda",
+            answers={"company_name": "Acme Inc."},
+            format="markdown",
+            email="founder@example.com",
+            phone="+1 415 555 0123",
+        )
+        with pytest.raises(ToolError, match="phone is optional"):
+            await mcp_generate_document("mutual-nda", format="markdown", phone="x")
+        with pytest.raises(ToolError, match="email is optional"):
+            await mcp_generate_document("mutual-nda", format="markdown", email="x")
+    assert result.slug == "mutual-nda"
+    assert "Acme Inc." in result.markdown
+    record.assert_awaited_once()
+    payload = record.await_args.kwargs["payload"]
+    assert payload["email"] == "founder@example.com"
+    assert payload["phone"] == "+1 415 555 0123"
+    assert payload["source"] == "mcp"
+
+
+@pytest.mark.asyncio
+async def test_mcp_generate_without_contact_details() -> None:
+    """Contact details stay optional on the MCP tool."""
+    record = AsyncMock()
+    with patch("clauseai.mcp.clauseai.record_generation", new=record):
+        await mcp_generate_document("mutual-nda", format="markdown")
+    payload = record.await_args.kwargs["payload"]
+    assert payload["email"] is None
+    assert payload["phone"] is None
+
+
+def test_feedback_slack_message_includes_phone() -> None:
+    """Feedback notifications show the phone so the operator can call back."""
+    payload = service.feedback_payload(
+        message="Add a SAFE template.",
+        category="template_request",
+        slug=None,
+        email=None,
+        phone="+1 415 555 0123",
+        source="api",
+        ip_address=None,
+        user_agent=None,
+    )
+    message = build_feedback_slack_message(payload)
+    fields = {
+        field["title"]: field["value"] for field in message["attachments"][0]["fields"]
+    }
+    assert fields["Phone"] == "+1 415 555 0123"
+    assert fields["Email"] == "not provided"
+
+
+@pytest.mark.asyncio
+async def test_record_feedback_logs_contact_details() -> None:
+    """The feedback log line carries the email and phone for follow-up."""
+    from loguru import logger
+
+    messages: list[str] = []
+    sink = logger.add(
+        lambda message: messages.append(message.record["message"]),
+        level="INFO",
+    )
+    payload = service.feedback_payload(
+        message="hi",
+        category=None,
+        slug=None,
+        email="founder@example.com",
+        phone="+1 415 555 0123",
+        source="api",
+        ip_address=None,
+        user_agent=None,
+    )
+    try:
+        with patch("clauseai.notify.notify_feedback", new_callable=AsyncMock):
+            await service.record_feedback(payload=payload)
+            await asyncio.sleep(0)
+    finally:
+        logger.remove(sink)
+    text = "\n".join(messages)
+    assert "email=founder@example.com" in text
+    assert "phone=+1 415 555 0123" in text

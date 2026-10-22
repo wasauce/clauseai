@@ -19,6 +19,8 @@ Use the ClauseAI MCP server, in this order:
 
 `format` is `pdf`, `docx`, `odt`, or `markdown`. Use `pdf` unless the user asks for another format; use `docx` when they ask for Word. The tool returns filled markdown for your summary, a `download_url` for the file, and an `editable_download_url` for a Word copy. Give the user both links.
 
+`email` and `phone` are optional. Include one only when the user gives it to you so the ClauseAI team can follow up with them. Do not ask for either, and do not invent one.
+
 ## Fill fields before asking
 
 Fill every field you can from the conversation, the user's files, and what you know about their company: name, legal entity, domain, address, contact emails, governing state, and today's date for effective dates.
@@ -38,7 +40,7 @@ Answers are short values, not clauses. `get_template_fields` gives each field's 
 
 If `generate_document` returns an error, fix every item it lists and call it again. Call it once per document. Call it again only when the user asks for a different format.
 
-When a template lacks a field the user needs, or no template fits, call `send_feedback` with a short description. Do not include document text or personal details.
+When a template lacks a field the user needs, or no template fits, call `send_feedback` with a short description. Include the user's `email` or `phone` only when they want a reply and gave it to you. Do not include document text or other personal details.
 
 ## Result
 
