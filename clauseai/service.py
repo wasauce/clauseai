@@ -63,6 +63,22 @@ FEEDBACK_RECEIVED = (
     "Feedback received. Nobody replies through this channel, so do not "
     "wait for a response or send the same feedback again."
 )
+FEEDBACK_RECEIVED_WITH_CONTACT = (
+    "Feedback received. The ClauseAI team may follow up at the email or "
+    "phone number you provided. Nobody replies through this channel, so do "
+    "not wait for a response here or send the same feedback again."
+)
+
+# Optional follow-up phone number: digits with common punctuation, an
+# optional leading +, and an optional extension. Length caps keep the
+# field from carrying a message.
+PHONE_MAX_LENGTH = 30
+PHONE_MIN_DIGITS = 7
+PHONE_MAX_DIGITS = 15
+_PHONE_RE = re.compile(
+    r"(?P<number>\+?[0-9(][0-9 ().-]*)(?:\s*(?:ext\.?|x)\s*[0-9]{1,6})?",
+    re.IGNORECASE,
+)
 
 _ISO_DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
 _PLACEHOLDER_RE = re.compile(
@@ -96,6 +112,10 @@ class RenderUnavailableError(ClauseAIError):
 
 class InvalidEmailError(ClauseAIError):
     """Raised when the optional contact email is not an address."""
+
+
+class InvalidPhoneError(ClauseAIError):
+    """Raised when the optional contact phone is not a phone number."""
 
 
 class InvalidFeedbackError(ClauseAIError):
@@ -745,6 +765,32 @@ def normalize_email(raw: str | None) -> str | None:
     return value
 
 
+def normalize_phone(raw: str | None) -> str | None:
+    """Return the optional contact phone number, or raise InvalidPhoneError.
+
+    Internal whitespace is collapsed; otherwise the number is kept as the
+    caller wrote it so the operator can dial it back.
+    """
+    if raw is None:
+        return None
+    value = " ".join(str(raw).split())
+    if not value:
+        return None
+    match = _PHONE_RE.fullmatch(value)
+    digits = len(re.sub(r"\D", "", match.group("number"))) if match else 0
+    if (
+        match is None
+        or len(value) > PHONE_MAX_LENGTH
+        or not PHONE_MIN_DIGITS <= digits <= PHONE_MAX_DIGITS
+    ):
+        raise InvalidPhoneError(
+            f"Invalid phone number: {_quote(value)}. phone is optional: send "
+            "one number with its country code, such as +1 415 555 0123, or "
+            "leave it out. Do not invent a number for the user."
+        )
+    return value
+
+
 def generation_payload(
     *,
     slug: str,
@@ -754,6 +800,7 @@ def generation_payload(
     source: str,
     ip_address: str | None,
     user_agent: str | None,
+    phone: str | None = None,
     mcp_client: str | None = None,
     mcp_client_version: str | None = None,
     origin: str | None = None,
@@ -767,6 +814,7 @@ def generation_payload(
         "source": source,
         "answers": answers,
         "email": email or None,
+        "phone": phone or None,
         "ip_address": ip_address,
         "user_agent": user_agent,
         "mcp_client": mcp_client or None,
@@ -787,6 +835,7 @@ async def record_generation(*, payload: dict[str, Any]) -> None:
         f"format={payload.get('format')} "
         f"source={payload.get('source')} "
         f"email={email or 'none'} "
+        f"phone={payload.get('phone') or 'none'} "
         f"answers={payload.get('answers')}"
     )
     logger.info(message + _caller_suffix(payload))
@@ -890,11 +939,16 @@ def feedback_payload(
     source: str,
     ip_address: str | None,
     user_agent: str | None,
+    phone: str | None = None,
     mcp_client: str | None = None,
     mcp_client_version: str | None = None,
     origin: str | None = None,
 ) -> dict[str, Any]:
-    """Validate a feedback submission and build its log / Slack payload."""
+    """Validate a feedback submission and build its log / Slack payload.
+
+    ``email`` and ``phone`` are optional ways for the operator to follow
+    up with the person who sent the feedback.
+    """
     text = str(message or "").strip()
     if not text:
         raise InvalidFeedbackError(
@@ -922,6 +976,7 @@ def feedback_payload(
         "template_slug": template_slug,
         "source": source,
         "email": normalize_email(email),
+        "phone": normalize_phone(phone),
         "ip_address": ip_address,
         "user_agent": user_agent,
         "mcp_client": mcp_client or None,
@@ -933,6 +988,13 @@ def feedback_payload(
     return payload
 
 
+def feedback_receipt_detail(payload: dict[str, Any]) -> str:
+    """Return the receipt text, noting a follow-up when contact details exist."""
+    if payload.get("email") or payload.get("phone"):
+        return FEEDBACK_RECEIVED_WITH_CONTACT
+    return FEEDBACK_RECEIVED
+
+
 async def record_feedback(*, payload: dict[str, Any]) -> None:
     """Log feedback to loguru and post it to Slack when configured."""
     logger.info(
@@ -941,6 +1003,7 @@ async def record_feedback(*, payload: dict[str, Any]) -> None:
         f"slug={payload.get('template_slug') or 'none'} "
         f"source={payload.get('source')} "
         f"email={payload.get('email') or 'none'} "
+        f"phone={payload.get('phone') or 'none'} "
         f"message={payload.get('message')!r}" + _caller_suffix(payload)
     )
 

@@ -104,6 +104,10 @@
                     <option value="markdown">Markdown</option>
                 </select>
             </div>
+            <p class="text-sm text-gray-500">
+                Optional: leave an email or phone number if you would like the
+                ClauseAI team to be able to follow up with you.
+            </p>
             <div>
                 <label for="email" class="block text-sm font-medium text-gray-900 mb-1">
                     Email (optional)
@@ -112,8 +116,23 @@
                     id="email"
                     name="email"
                     type="email"
+                    autocomplete="email"
                     class="w-full rounded-lg border-gray-300 border px-3 py-2 text-gray-900"
-                    placeholder="Where should we mention this download happened?"
+                    placeholder="you@example.com"
+                >
+            </div>
+            <div>
+                <label for="phone" class="block text-sm font-medium text-gray-900 mb-1">
+                    Phone (optional)
+                </label>
+                <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    autocomplete="tel"
+                    maxlength="30"
+                    class="w-full rounded-lg border-gray-300 border px-3 py-2 text-gray-900"
+                    placeholder="+1 415 555 0123"
                 >
             </div>
             <button

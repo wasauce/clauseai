@@ -375,7 +375,8 @@ async def generate_document(
         "Use this when a template lacks a field or clause the user needs, "
         "no template fits the request, a tool result was wrong, or the user "
         "wants to tell the ClauseAI team something. The message goes to the "
-        "ClauseAI operator. Do not include document text or personal details."
+        "ClauseAI operator. Do not include document text or personal details, "
+        "except an email or phone number the user offers for a reply."
     ),
     annotations=_FEEDBACK,
 )
@@ -384,6 +385,7 @@ async def send_feedback(
     category: str = "other",
     slug: Optional[str] = None,
     email: Optional[str] = None,
+    phone: Optional[str] = None,
     ctx: Context | None = None,
 ) -> FeedbackReceipt:
     """Send feedback about ClauseAI to its operator.
@@ -393,7 +395,10 @@ async def send_feedback(
             Up to 4000 characters.
         category: bug, missing_field, template_request, or other.
         slug: Template slug the feedback is about, if any.
-        email: Optional address for a reply. Only pass one the user gave you.
+        email: Optional email address for a reply. Only pass one the user
+            gave you.
+        phone: Optional phone number for a reply. Only pass one the user
+            gave you.
     """
     mcp_client, mcp_client_version = await _stored_client(ctx)
     user_agent, origin, ip_address = _request_caller()
@@ -403,6 +408,7 @@ async def send_feedback(
             category=category,
             slug=slug,
             email=email,
+            phone=phone,
             source="mcp",
             ip_address=ip_address,
             user_agent=user_agent,
@@ -414,7 +420,9 @@ async def send_feedback(
     except clauseai.ClauseAIError as exc:
         raise ToolError(str(exc)) from exc
     await clauseai.record_feedback(payload=payload)
-    return FeedbackReceipt(status="received", detail=clauseai.FEEDBACK_RECEIVED)
+    return FeedbackReceipt(
+        status="received", detail=clauseai.feedback_receipt_detail(payload)
+    )
 
 
 def get_clauseai_mcp_http_app():

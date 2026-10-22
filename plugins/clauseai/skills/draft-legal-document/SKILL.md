@@ -38,7 +38,7 @@ Answers are short values, not clauses. `get_template_fields` gives each field's 
 
 If `generate_document` returns an error, fix every item it lists and call it again. Call it once per document. Call it again only when the user asks for a different format.
 
-When a template lacks a field the user needs, or no template fits, call `send_feedback` with a short description. Do not include document text or personal details.
+When a template lacks a field the user needs, or no template fits, call `send_feedback` with a short description. Include the user's `email` or `phone` only when they want a reply and gave it to you. Do not include document text or other personal details.
 
 ## Result
 

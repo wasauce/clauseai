@@ -1,6 +1,6 @@
 **Privacy Policy**
 
-Effective as of October 2, 2026.
+Effective as of October 22, 2026.
 
 **California Notice at Collection / State Privacy Rights Notice:** See the State privacy rights notice section below for information about your rights under applicable state privacy laws.
 
@@ -14,9 +14,9 @@ Your use of the Service is also subject to our [Terms of Use](https://clauseai.e
 
 Personal information you may provide to us through the Service includes:
 
-1. **Contact data**, such as an email address, if you choose to include one when you generate a document.
+1. **Contact data**, such as an email address or phone number, if you choose to include one when you generate a document so that we can follow up with you.
 2. **Document inputs**, such as the text you type into a template. That text is used to fill the document and may include names, addresses, emails, or other details you choose to enter.
-3. **Communications data**, if you email us about the Service or send feedback through the feedback endpoint or the MCP feedback tool. Feedback includes the message, a category, the template it concerns if you name one, and your email address if you provide one.
+3. **Communications data**, if you email us about the Service or send feedback through the feedback endpoint or the MCP feedback tool. Feedback includes the message, a category, the template it concerns if you name one, and your email address or phone number if you provide one so that we can reply.
 
 We do not ask you to create an account, and we do not collect payment card data, government identification numbers, or precise geolocation.
 
@@ -25,7 +25,7 @@ We do not ask you to create an account, and we do not collect payment card data,
 We automatically log information about your requests to the Service:
 
 1. **Device and request data**, such as your IP address, user agent, the page or API path you request, the time of the request, and the HTTP status of the response. When an MCP client opens a session, we also log the client name and version that client declared.
-2. **Generation records**, when you generate a document. A generation record includes the template, format, the answers you submitted, your IP address, your user agent, and your email address if you provided one. A generation through the MCP server records those same fields, labels the source as MCP, and also records the client name and version the caller declared in the MCP handshake, and the Origin header when the caller sends one. If a request to generate a document is rejected, we log the template, the names of the fields that were rejected and why, and the same caller details, but not the answers.
+2. **Generation records**, when you generate a document. A generation record includes the template, format, the answers you submitted, your IP address, your user agent, and your email address or phone number if you provided one. A generation through the MCP server records those same fields, labels the source as MCP, and also records the client name and version the caller declared in the MCP handshake, and the Origin header when the caller sends one. If a request to generate a document is rejected, we log the template, the names of the fields that were rejected and why, and the same caller details, but not the answers.
 3. **Feedback records**, when you or your agent send feedback. A feedback record includes the feedback described above, your IP address, your user agent, and, for feedback sent through the MCP server, the client name and version the caller declared and the Origin header when the caller sends one.
 
 The website loads scripts from the Tailwind CSS CDN (`cdn.tailwindcss.com`) and jsDelivr (`cdn.jsdelivr.net`). Your browser sends those providers your IP address and ordinary request headers. Their own privacy policies govern that collection.
@@ -58,7 +58,7 @@ We do not use personal information for targeted advertising. We do not use perso
 
 We share personal information with the following parties:
 
-**Service providers.** Hosting and logging providers that operate the Service. If an operations webhook is configured, we also send the generation record (template, format, answers, optional email, IP address, user agent, and, for MCP generations, the declared client name and version and the Origin header when the caller sends one) to Slack. We send feedback records to Slack in the same way.
+**Service providers.** Hosting and logging providers that operate the Service. If an operations webhook is configured, we also send the generation record (template, format, answers, optional email or phone number, IP address, user agent, and, for MCP generations, the declared client name and version and the Origin header when the caller sends one) to Slack. We send feedback records to Slack in the same way.
 
 **Content-delivery networks.** Tailwind CSS CDN and jsDelivr receive the technical data your browser sends when it loads page scripts.
 
@@ -80,7 +80,7 @@ We keep personal information only as long as we need it for the purposes above, 
 
 # Your choices
 
-You can use the Service without providing an email address. If you do not want a generation record to include particular details, do not type those details into the template.
+You can use the Service without providing an email address or phone number. If you do not want a generation record to include particular details, do not type those details into the template.
 
 Residents of U.S. states with applicable privacy laws can find additional rights below. To make a request, email [wferrell@gmail.com](mailto:wferrell@gmail.com). We may not be able to process a request if you do not give us enough detail to find the relevant generation record, such as the email you submitted and the approximate time of the request.
 
@@ -160,8 +160,8 @@ Under some State Privacy Laws, you may enable an authorized agent to make a requ
 
 | Personal Information ("PI") we collect | CCPA statutory category | Purposes | Categories of third parties to whom we disclose PI for a business purpose | Categories of third parties to whom we sell or share PI |
 | --- | --- | --- | --- | --- |
-| Optional email address | Identifiers | Record a download you request and, when configured, send an operations notice | Hosting and logging providers; Slack, when an operations webhook is configured | None |
-| Feedback you send, with an optional email address | Identifiers; personal information you choose to provide | Review and respond to feedback and improve the Service | Hosting and logging providers; Slack, when an operations webhook is configured | None |
+| Optional email address or phone number | Identifiers | Record a download you request, follow up with you about it if needed, and, when configured, send an operations notice | Hosting and logging providers; Slack, when an operations webhook is configured | None |
+| Feedback you send, with an optional email address or phone number | Identifiers; personal information you choose to provide | Review and respond to feedback and improve the Service | Hosting and logging providers; Slack, when an operations webhook is configured | None |
 | Text you type into a template | Personal information you choose to provide, which may include identifiers | Generate the document you request and keep an operational record of that generation | Hosting and logging providers; Slack, when an operations webhook is configured | None |
 | IP address, user agent, request path, and time | Internet or other electronic network activity information | Operate, secure, and debug the Service | Hosting provider; Slack, when an operations webhook is configured, for website and API generations; content-delivery networks that serve page scripts (Tailwind CSS CDN and jsDelivr) | None |
 
