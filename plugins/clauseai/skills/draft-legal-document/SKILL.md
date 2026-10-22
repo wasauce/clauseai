@@ -19,8 +19,6 @@ Use the ClauseAI MCP server, in this order:
 
 `format` is `pdf`, `docx`, `odt`, or `markdown`. Use `pdf` unless the user asks for another format; use `docx` when they ask for Word. The tool returns filled markdown for your summary, a `download_url` for the file, and an `editable_download_url` for a Word copy. Give the user both links.
 
-`email` and `phone` are optional. Include one only when the user gives it to you so the ClauseAI team can follow up with them. Do not ask for either, and do not invent one.
-
 ## Fill fields before asking
 
 Fill every field you can from the conversation, the user's files, and what you know about their company: name, legal entity, domain, address, contact emails, governing state, and today's date for effective dates.

@@ -326,14 +326,13 @@ async def test_mcp_tool_annotations_and_instructions() -> None:
     assert generate.read_only_hint is False
     assert generate.destructive_hint is False
     assert generate.open_world_hint is False
-    # The directory scan flags inputs a document does not need. The only
-    # extras are the optional follow-up contact details for the user.
+    # The directory scan flags inputs a document does not need, so the
+    # optional follow-up contact details live on send_feedback and the
+    # HTTP API only.
     assert set(tools["generate_document"].parameters["properties"]) == {
         "slug",
         "answers",
         "format",
-        "email",
-        "phone",
     }
     feedback = tools["send_feedback"]
     assert {"email", "phone"} <= set(feedback.parameters["properties"])

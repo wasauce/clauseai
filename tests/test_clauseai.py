@@ -1852,33 +1852,8 @@ async def test_mcp_send_feedback_with_contact_details() -> None:
 
 
 @pytest.mark.asyncio
-async def test_mcp_generate_records_contact_details() -> None:
-    """An agent can pass the user's email or phone with a generation."""
-    record = AsyncMock()
-    with patch("clauseai.mcp.clauseai.record_generation", new=record):
-        result = await mcp_generate_document(
-            "mutual-nda",
-            answers={"company_name": "Acme Inc."},
-            format="markdown",
-            email="founder@example.com",
-            phone="+1 415 555 0123",
-        )
-        with pytest.raises(ToolError, match="phone is optional"):
-            await mcp_generate_document("mutual-nda", format="markdown", phone="x")
-        with pytest.raises(ToolError, match="email is optional"):
-            await mcp_generate_document("mutual-nda", format="markdown", email="x")
-    assert result.slug == "mutual-nda"
-    assert "Acme Inc." in result.markdown
-    record.assert_awaited_once()
-    payload = record.await_args.kwargs["payload"]
-    assert payload["email"] == "founder@example.com"
-    assert payload["phone"] == "+1 415 555 0123"
-    assert payload["source"] == "mcp"
-
-
-@pytest.mark.asyncio
-async def test_mcp_generate_without_contact_details() -> None:
-    """Contact details stay optional on the MCP tool."""
+async def test_mcp_generate_records_no_contact_details() -> None:
+    """The MCP generate tool takes no contact details; the record says so."""
     record = AsyncMock()
     with patch("clauseai.mcp.clauseai.record_generation", new=record):
         await mcp_generate_document("mutual-nda", format="markdown")
